@@ -126,7 +126,7 @@ fn generate_map(player: &mut Unit) -> Map {
     let mut rooms = vec![];
 
     for _ in 0..config::MAX_ROOMS {
-        
+
         let width = rand::thread_rng().gen_range(config::ROOM_MIN_SIZE..config::ROOM_MAX_SIZE + 1);
         let height = rand::thread_rng().gen_range(config::ROOM_MIN_SIZE..config::ROOM_MAX_SIZE + 1);
 
@@ -236,7 +236,7 @@ fn main() {
 
     let player = Unit::new(0, 0, '@', WHITE);
 
-    let npc = Unit::new(config::SCREEN_WIDTH / 2 - 5, config::SCREEN_HEIGHT / 2, '$', GREEN);
+    let npc = Unit::new(config::SCREEN_WIDTH / 2 - 5, config::SCREEN_HEIGHT / 2, 'M', GREEN);
 
     let mut units = [player, npc];
 
