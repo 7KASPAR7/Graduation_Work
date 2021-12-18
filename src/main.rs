@@ -126,55 +126,43 @@ fn generate_map(player: &mut Unit) -> Map {
     let mut rooms = vec![];
 
     for _ in 0..config::MAX_ROOMS {
-        // random width and height
+        
         let width = rand::thread_rng().gen_range(config::ROOM_MIN_SIZE..config::ROOM_MAX_SIZE + 1);
         let height = rand::thread_rng().gen_range(config::ROOM_MIN_SIZE..config::ROOM_MAX_SIZE + 1);
-        // random position without going out of the boundaries of the map
+
         let x = rand::thread_rng().gen_range(0..config::MAP_WIDTH - width);
         let y = rand::thread_rng().gen_range(0..config::MAP_HEIGHT - height);
 
         let new_room = Rect::new(x, y, width, height);
 
-        // run through the other rooms and see if they intersect with this one
         let failed = rooms
             .iter()
             .any(|other_room| new_room.is_intersected_with(other_room));
 
         if !failed {
-            // this means there are no intersections, so this room is valid
 
-            // "paint" it to the map's tiles
             create_room(new_room, &mut map);
 
-            // center coordinates of the new room, will be useful later
+            // center coordinates of the new room
             let (new_x, new_y) = new_room.center();
             println!("new {}, {}", new_x, new_y);
 
             if rooms.is_empty() {
-                // this is the first room, where the player starts at
                 player.x = new_x;
                 player.y = new_y;
             } else {
-                // all rooms after the first:
-                // connect it to the previous room with a tunnel
 
-                // center coordinates of the previous room
                 let (prev_x, prev_y) = rooms[rooms.len() - 1].center();
                 println!("prev {}, {}", prev_x, prev_y);
 
-                // toss a coin (random bool value -- either true or false)
                 if rand::random() {
-                    // first move horizontally, then vertically
                     create_hor_tunnel(prev_x, new_x, prev_y, &mut map);
                     create_ver_tunnel(new_x, prev_y, new_y,  &mut map);
                 } else {
-                    // first move vertically, then horizontally
                     create_ver_tunnel(prev_x, prev_y, new_y, &mut map);
                     create_hor_tunnel(prev_x, new_x, new_y, &mut map);
                 }
             }
-
-            // finally, append the new room to the list
             rooms.push(new_room);
         }
     }
@@ -183,7 +171,6 @@ fn generate_map(player: &mut Unit) -> Map {
 }
 
 fn render(tcod: &mut Tcod, game: &Game, units: &[Unit]) {
-    // go through all tiles, and set their background color
     for y in 0..config::MAP_HEIGHT {
         for x in 0..config::MAP_WIDTH {
             let wall = game.map[x as usize][y as usize].is_visible;
@@ -197,12 +184,10 @@ fn render(tcod: &mut Tcod, game: &Game, units: &[Unit]) {
         }
     }
 
-    // draw all objects in the list
     for unit in units {
         unit.draw(&mut tcod.screen);
     }
 
-    // blit the contents of "con" to the root console
     blit(
         &tcod.screen,
         (0, 0),
@@ -220,18 +205,9 @@ fn handle_keys(tcod: &mut Tcod, game: &Game, player: &mut Unit) -> bool {
 
     let key = tcod.root.wait_for_keypress(true);
     match key {
-        // Key {
-        //     code: Enter,
-        //     alt: true,
-        //     ..
-        // } => {
-        //     // Alt+Enter: toggle fullscreen
-        //     let fullscreen = tcod.root.is_fullscreen();
-        //     tcod.root.set_fullscreen(!fullscreen);
-        // }
+
         Key { code: Escape, .. } => return true, // exit game
 
-        // movement keys
         Key { code: Up, .. } => player.move_by(0, -1, game),
         Key { code: Down, .. } => player.move_by(0, 1, game),
         Key { code: Left, .. } => player.move_by(-1, 0, game),
@@ -260,14 +236,11 @@ fn main() {
 
     let player = Unit::new(0, 0, '@', WHITE);
 
-    // create an NPC
     let npc = Unit::new(config::SCREEN_WIDTH / 2 - 5, config::SCREEN_HEIGHT / 2, '$', GREEN);
 
-    // the list of objects with those two
     let mut units = [player, npc];
 
     let game = Game {
-        // generate map (at this point it's not drawn to the screen)
         map: generate_map(&mut units[0]),
     };
 
@@ -275,12 +248,10 @@ fn main() {
         
         tcod.screen.clear();
 
-         // render the screen
          render(&mut tcod, &game, &units);
 
          tcod.root.flush();
  
-         // handle keys and exit game if needed
          let player = &mut units[0];
          let exit = handle_keys(&mut tcod, &game, player);
          if exit {
