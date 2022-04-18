@@ -9,7 +9,35 @@ use tcod::map::{Map as FovMap};
 mod config;
 mod structures;
 
-fn create_room(room: structures::Rect, map: &mut structures::Map){
+fn spawn_units(room: structures::Rect, map: &structures::Map, units: &mut Vec<structures::Unit>) {
+    let monster_num = rand::thread_rng().gen_range(0..config::MAX_ROOM_MONSTERS + 1);
+    
+    for _ in 0..monster_num {
+        let x = rand::thread_rng().gen_range(room.x1..room.x2+1);
+        let y = rand::thread_rng().gen_range(room.y1..room.y2+1);
+        if !is_blocked(x, y, map, units) {
+            let mut monster;
+            if rand::random::<f32>() < 0.75 {
+                monster = structures::Unit::new(x, y, 'O', DESATURATED_PURPLE, "Orc", true);
+            } 
+            else {
+                monster = structures::Unit::new(x, y, 'T', DESATURATED_ORANGE, "Troll", true);
+            }
+            monster.alive = true;
+            units.push(monster);
+        }
+    }
+
+}
+
+fn is_blocked(x: i32, y: i32, map: &structures::Map, units: &[structures::Unit]) -> bool {
+    if map[x as usize][y as usize].collision_enabled {
+        return true;
+    }
+    units.iter().any(|unit| unit.blocks && unit.loc() == (x,y))
+}
+
+fn create_room(room: structures::Rect, map: &mut structures::Map) {
     for x in (room.x1 + 1).. room.x2 {
         for y in (room.y1 + 1).. room.y2 {
             map[x as usize][y as usize] = structures::Tile::empty();
@@ -29,7 +57,7 @@ fn create_ver_tunnel(x: i32, y1: i32, y2: i32, map: &mut structures::Map) {
     }
 }
 
-fn generate_map(units: &mut [structures::Unit; 2]) -> structures::Map {
+fn generate_map(units: &mut Vec<structures::Unit>) -> structures::Map {
 
     let mut map = vec![vec![structures::Tile::wall(); config::MAP_HEIGHT as usize]; config::MAP_WIDTH as usize];
     
@@ -45,30 +73,22 @@ fn generate_map(units: &mut [structures::Unit; 2]) -> structures::Map {
 
         let new_room = structures::Rect::new(x, y, width, height);
 
-        let failed = rooms
-            .iter()
-            .any(|other_room| new_room.is_intersected_with(other_room));
+        let failed = rooms.iter().any(|other_room| new_room.is_intersected_with(other_room));
 
         if !failed {
 
             create_room(new_room, &mut map);
+
+            spawn_units(new_room, &map, units);
 
             // center coordinates of the new room
             let (new_x, new_y) = new_room.center();
             println!("new {}, {}", new_x, new_y);
 
             if rooms.is_empty() {
-                let player = &mut units[0];
-                player.x = new_x;
-                player.y = new_y;
+                units[config::PLAYER].set_loc(new_x, new_y);
             }  
             else {
-                if rooms.len() == 1 {
-                    let npc = &mut units[1];
-                    npc.x = new_x;
-                    npc.y = new_y;    
-                } 
-
                 let (prev_x, prev_y) = rooms[rooms.len() - 1].center();
                 println!("prev {}, {}", prev_x, prev_y);
 
@@ -91,7 +111,7 @@ fn render(tcod: &mut structures::Tcod, game: &mut structures::Game, units: &[str
 
     if fov_recompute {
         // recompute FOV if needed (the player moved or something)
-        let player = &units[0];
+        let player = &units[config::PLAYER];
         tcod.fov.compute_fov(player.x, player.y, config::FOV_RADIUS, config::FOV_LIGHT_WALLS, config::FOV_ALG);
     }
 
@@ -140,27 +160,71 @@ fn render(tcod: &mut structures::Tcod, game: &mut structures::Game, units: &[str
     );
 }
 
-fn handle_keys(tcod: &mut structures::Tcod, game: &structures::Game, units: &mut [structures::Unit;2]) -> bool {
+fn move_by(id: usize, dx: i32, dy: i32, map: &structures::Map, units: &mut [structures::Unit]) {
+    let (x, y) = units[id].loc();
+    if !is_blocked(x + dx, y + dy, map, units) {
+        units[id].set_loc(x + dx, y + dy);
+    }
+}
+
+fn handle_keys(tcod: &mut structures::Tcod, game: &structures::Game, units: &mut [structures::Unit]) -> structures::PlayerAction {
     use tcod::input::Key;
     use tcod::input::KeyCode::*;
+    use structures::PlayerAction::*;
 
     let key = tcod.root.wait_for_keypress(true);
-    let player = &mut units[0];
-    match key {
+    let player_alive = units[config::PLAYER].alive;
 
-        Key { code: Escape, .. } => return true, // exit game
+    match (key, key.text(), player_alive) {
+
+        (Key { code: Escape, .. }, _, _) => Exit, // exit game
         
         // Write in the {} some logic for player and npc moving
-        Key { code: Up, .. } => player.move_by(0, -1, game),
-        Key { code: Down, .. } => player.move_by(0, 1, game),
-        Key { code: Left, .. } => player.move_by(-1, 0, game),
-        Key { code: Right, .. } => player.move_by(1, 0, game),
+        (Key { code: Up, .. }, _, true) => {
+            player_move_or_attack(0, -1, game, units);
+            TookTurn
+        },
+        (Key { code: Down, .. }, _, true) => {
+            player_move_or_attack(0, 1, game, units);
+            TookTurn
+        },
+        (Key { code: Left, .. }, _, true) => {
+            player_move_or_attack(-1, 0, game, units);
+            TookTurn
+        },
+        (Key { code: Right, .. }, _, true) => {
+            player_move_or_attack(1, 0, game, units);
+            TookTurn
+        },
 
-        _ => {}
+        _ => DidnotTakeTurn,
     }
-    false
+    
 }
     
+
+fn player_move_or_attack(dx: i32, dy: i32, game: &structures::Game, units: &mut [structures::Unit]) {
+    // the coordinates the player is moving to/attacking
+    let x = units[config::PLAYER].x + dx;
+    let y = units[config::PLAYER].y + dy;
+
+    // try to find an attackable object there
+    let target_id = units.iter().position(|unit| unit.loc() == (x, y));
+
+    // attack if target found, move otherwise
+    match target_id {
+        Some(target_id) => {
+            println!(
+                "You tried to attack {}!",
+                units[target_id].name
+            );
+        }
+        None => {
+            move_by(config::PLAYER, dx, dy, &game.map, units);
+        }
+    }
+}
+
 
 fn main() {
     tcod::system::set_fps(config::LIMIT_FPS);
@@ -181,11 +245,11 @@ fn main() {
         fov: FovMap::new(config::MAP_WIDTH, config::MAP_HEIGHT),  
     };
 
-    let player = structures::Unit::new(5, 5, '@', BLUE);
+    let mut player = structures::Unit::new(5, 5, '@', BLUE, "Player", true);
 
-    let npc = structures::Unit::new(5, 5, 'M', RED);
+    player.alive = true;
 
-    let mut units = [player, npc]; // don't forget to change the number of units in generate_map() and handle_keys() definitions
+    let mut units = vec![player]; // don't forget to change the number of units in generate_map() and handle_keys() definitions
 
     let mut game = structures::Game {
         map: generate_map(&mut units),
@@ -207,17 +271,22 @@ fn main() {
         
         tcod.screen.clear();
 
-        let fov_recompute = previous_player_position != (units[0].x, units[0].y);
+        let fov_recompute = previous_player_position != (units[config::PLAYER].x, units[config::PLAYER].y);
         render(&mut tcod, &mut game, &units, fov_recompute);
         tcod.root.flush();
- 
-        let player = &mut units[0];
 
-        previous_player_position = (player.x, player.y);
-
-        let exit = handle_keys(&mut tcod, &game, &mut units);
-        if exit {
-             break;
+        previous_player_position = units[config::PLAYER].loc();
+        let player_action = handle_keys(&mut tcod, &game, &mut units);
+        if player_action == structures::PlayerAction::Exit {
+            break;
+        }
+        if units[config::PLAYER].alive && player_action != structures::PlayerAction::DidnotTakeTurn {
+            for unit in &units {
+                // only if unitt is not player
+                if (unit as *const _) != (&units[config::PLAYER] as *const _) {
+                    println!("it is the {}'s turn!", unit.name);
+                }
+            }
         }
     }
 }

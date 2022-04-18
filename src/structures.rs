@@ -75,23 +75,35 @@ pub struct Unit {
     pub y: i32,
     pub symbol: char,
     pub color: Color,
+    pub name: String,
+    pub blocks: bool,
+    pub alive: bool,
 }
 
 impl Unit {
-    pub fn new(x: i32, y: i32, symbol: char, color: Color) -> Self{
-        Unit{x, y, symbol, color}
+    pub fn new(x: i32, y: i32, symbol: char, color: Color, name: &str, blocks: bool) -> Self{
+        Unit{x, y, symbol, color, name: name.into(), blocks, alive: false}
     }
 
-    pub fn move_by(&mut self, x_offset: i32, y_offset: i32, game: &Game) {
-        if !game.map[(self.x + x_offset) as usize][(self.y + y_offset) as usize].collision_enabled {
-            self.x += x_offset;
-            self.y += y_offset;
-        } 
-    }
+    // pub fn move_by(&mut self, x_offset: i32, y_offset: i32, game: &Game) {
+    //     if !game.map[(self.x + x_offset) as usize][(self.y + y_offset) as usize].collision_enabled {
+    //         self.x += x_offset;
+    //         self.y += y_offset;
+    //     } 
+    // }
 
     pub fn draw(&self, screen: &mut dyn Console) {
         screen.set_default_foreground(self.color);
         screen.put_char(self.x, self.y, self.symbol, BackgroundFlag::None);
+    }
+
+    pub fn loc(&self) -> (i32, i32) {
+        (self.x, self.y)
+    }
+
+    pub fn set_loc(&mut self, x: i32, y: i32) {
+        self.x = x;
+        self.y = y;
     }
 }
 
@@ -101,4 +113,11 @@ pub type Map = Vec<Vec<Tile>>;
 
 pub struct Game{
     pub map: Map,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum PlayerAction {
+    TookTurn,
+    DidnotTakeTurn,
+    Exit,
 }
