@@ -5,123 +5,31 @@ use tcod::colors::*;
 use tcod::console::*;
 
 mod config;
+mod structures;
 
-
-
-struct Tcod {
-    root: Root,
-    screen: Offscreen,
-}
-
-// all map is only tiles
-#[derive(Clone, Copy, Debug)]
-struct Tile {
-    collision_enabled: bool,
-    is_visible: bool,
-}
-
-impl Tile{
-    fn empty() -> Self {
-        // we can not collide and see the empty tile
-        Tile {
-            collision_enabled: false,
-            is_visible: false,
-        }
-    }
-
-    fn wall() -> Self {
-        // we can collide and see the wall
-        Tile {
-            collision_enabled: true,
-            is_visible: true,
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug)]
-struct Rect {
-    x1: i32,
-    y1: i32,
-    x2: i32,
-    y2: i32,
-}
-
-impl Rect{
-    pub fn new(x: i32, y: i32, width: i32, height: i32) -> Self {
-        Rect {
-            x1: x,
-            y1: y,
-            x2: x + width,
-            y2: y + height,
-        }
-    }
-
-    pub fn is_intersected_with(&self, second_rect: &Rect) -> bool{
-        (self.x1 <= second_rect.x2) && (self.x2 >= second_rect.x2) && (self.y1 <= second_rect.y2) && (self.y2 >= second_rect.y1)
-    }
-
-    pub fn center(&self) -> (i32, i32){
-        let center_x = (self.x1 + self.x2) / 2;
-        let center_y = (self.y1 + self.y2) / 2;
-        (center_x, center_y)
-    }
-}
-
-#[derive(Debug)]
-struct Unit {
-    x: i32,
-    y: i32,
-    symbol: char,
-    color: Color,
-}
-
-impl Unit {
-    pub fn new(x: i32, y: i32, symbol: char, color: Color) -> Self{
-        Unit{x, y, symbol, color}
-    }
-
-    pub fn move_by(&mut self, x_offset: i32, y_offset: i32, game: &Game) {
-        if !game.map[(self.x + x_offset) as usize][(self.y + y_offset) as usize].collision_enabled {
-            self.x += x_offset;
-            self.y += y_offset;
-        } 
-    }
-
-    pub fn draw(&self, screen: &mut dyn Console) {
-        screen.set_default_foreground(self.color);
-        screen.put_char(self.x, self.y, self.symbol, BackgroundFlag::None);
-    }
-}
-
-// map is 2-dimension list of tiles
-type Map = Vec<Vec<Tile>>;
-
-struct Game{
-    map: Map,
-}
-
-fn create_room(room: Rect, map: &mut Map){
+fn create_room(room: structures::Rect, map: &mut structures::Map){
     for x in (room.x1 + 1).. room.x2 {
         for y in (room.y1 + 1).. room.y2 {
-            map[x as usize][y as usize] = Tile::empty();
+            map[x as usize][y as usize] = structures::Tile::empty();
         }
     }
 }
 
-fn create_hor_tunnel(x1: i32, x2: i32, y: i32, map: &mut Map) {
+fn create_hor_tunnel(x1: i32, x2: i32, y: i32, map: &mut structures::Map) {
     for x in cmp::min(x1, x2)..(cmp::max(x1, x2) + 1) {
-        map[x as usize][y as usize] = Tile::empty();
+        map[x as usize][y as usize] = structures::Tile::empty();
     }
 }
 
-fn create_ver_tunnel(x: i32, y1: i32, y2: i32, map: &mut Map) {
+fn create_ver_tunnel(x: i32, y1: i32, y2: i32, map: &mut structures::Map) {
     for y in cmp::min(y1, y2)..(cmp::max(y1, y2) + 1) {
-        map[x as usize][y as usize] = Tile::empty();
+        map[x as usize][y as usize] = structures::Tile::empty();
     }
 }
 
-fn generate_map(player: &mut Unit) -> Map {
-    let mut map = vec![vec![Tile::wall(); config::MAP_HEIGHT as usize]; config::MAP_WIDTH as usize];
+fn generate_map(units: &mut [structures::Unit; 2]) -> structures::Map {
+
+    let mut map = vec![vec![structures::Tile::wall(); config::MAP_HEIGHT as usize]; config::MAP_WIDTH as usize];
     
     let mut rooms = vec![];
 
@@ -133,7 +41,7 @@ fn generate_map(player: &mut Unit) -> Map {
         let x = rand::thread_rng().gen_range(0..config::MAP_WIDTH - width);
         let y = rand::thread_rng().gen_range(0..config::MAP_HEIGHT - height);
 
-        let new_room = Rect::new(x, y, width, height);
+        let new_room = structures::Rect::new(x, y, width, height);
 
         let failed = rooms
             .iter()
@@ -148,9 +56,16 @@ fn generate_map(player: &mut Unit) -> Map {
             println!("new {}, {}", new_x, new_y);
 
             if rooms.is_empty() {
+                let player = &mut units[0];
                 player.x = new_x;
                 player.y = new_y;
-            } else {
+            }  
+            else {
+                if rooms.len() == 1 {
+                    let npc = &mut units[1];
+                    npc.x = new_x;
+                    npc.y = new_y;    
+                } 
 
                 let (prev_x, prev_y) = rooms[rooms.len() - 1].center();
                 println!("prev {}, {}", prev_x, prev_y);
@@ -170,7 +85,7 @@ fn generate_map(player: &mut Unit) -> Map {
     map
 }
 
-fn render(tcod: &mut Tcod, game: &Game, units: &[Unit]) {
+fn render(tcod: &mut structures::Tcod, game: &structures::Game, units: &[structures::Unit]) {
     for y in 0..config::MAP_HEIGHT {
         for x in 0..config::MAP_WIDTH {
             let wall = game.map[x as usize][y as usize].is_visible;
@@ -199,7 +114,7 @@ fn render(tcod: &mut Tcod, game: &Game, units: &[Unit]) {
     );
 }
 
-fn handle_keys(tcod: &mut Tcod, game: &Game, player: &mut Unit) -> bool {
+fn handle_keys(tcod: &mut structures::Tcod, game: &structures::Game, player: &mut structures::Unit) -> bool {
     use tcod::input::Key;
     use tcod::input::KeyCode::*;
 
@@ -213,7 +128,9 @@ fn handle_keys(tcod: &mut Tcod, game: &Game, player: &mut Unit) -> bool {
         Key { code: Left, .. } => player.move_by(-1, 0, game),
         Key { code: Right, .. } => player.move_by(1, 0, game),
 
-        _ => {}
+        _ => {
+            // write here the code for player search 
+        }
     }
     false
 }
@@ -232,16 +149,16 @@ fn main() {
 
     let screen = Offscreen::new(config::MAP_WIDTH, config::MAP_HEIGHT);
 
-    let mut tcod = Tcod {root, screen};
+    let mut tcod = structures::Tcod {root, screen};
 
-    let player = Unit::new(0, 0, '@', WHITE);
+    let player = structures::Unit::new(5, 5, '@', WHITE);
 
-    let npc = Unit::new(config::SCREEN_WIDTH / 2 - 5, config::SCREEN_HEIGHT / 2, 'M', GREEN);
+    let npc = structures::Unit::new(5, 5, 'M', GREEN);
 
-    let mut units = [player, npc];
+    let mut units = [player, npc]; // don't forget to change the number of units in generate_map() definition
 
-    let game = Game {
-        map: generate_map(&mut units[0]),
+    let game = structures::Game {
+        map: generate_map(&mut units),
     };
 
     while !tcod.root.window_closed() {
