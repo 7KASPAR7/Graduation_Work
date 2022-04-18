@@ -15,6 +15,7 @@ pub struct Tcod {
 pub struct Tile {
     pub collision_enabled: bool,
     pub is_visible: bool,
+    pub is_explored: bool,
 }
 
 impl Tile{
@@ -23,6 +24,7 @@ impl Tile{
         Tile {
             collision_enabled: false,
             is_visible: false,
+            is_explored: false,
         }
     }
 
@@ -31,6 +33,7 @@ impl Tile{
         Tile {
             collision_enabled: true,
             is_visible: true,
+            is_explored: false,
         }
     }
 }

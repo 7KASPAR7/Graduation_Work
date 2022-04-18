@@ -87,7 +87,7 @@ fn generate_map(units: &mut [structures::Unit; 2]) -> structures::Map {
     map
 }
 
-fn render(tcod: &mut structures::Tcod, game: &structures::Game, units: &[structures::Unit], fov_recompute: bool) {
+fn render(tcod: &mut structures::Tcod, game: &mut structures::Game, units: &[structures::Unit], fov_recompute: bool) {
 
     if fov_recompute {
         // recompute FOV if needed (the player moved or something)
@@ -100,16 +100,28 @@ fn render(tcod: &mut structures::Tcod, game: &structures::Game, units: &[structu
             let visible = tcod.fov.is_in_fov(x, y);
             let wall = game.map[x as usize][y as usize].is_visible;
             let color = match (visible, wall) {
-                // outside of FoV:
+                // outside of field of view:
                 (false, true) => config::COLOR_DARK_WALL,
                 (false, false) => config::COLOR_DARK_GROUND,
-                // inside FoV:
+                // inside fov:
                 (true, true) => config::COLOR_LIGHT_WALL,
                 (true, false) => config::COLOR_LIGHT_GROUND,
             };
-            tcod.screen.set_char_background(x, y, color, BackgroundFlag::Set);
+
+            let explored = &mut game.map[x as usize][y as usize].is_explored;
+            if visible {
+                // since it's visible, explore it
+                *explored = true;
+            }
+            if *explored {
+                // show explored tiles only (any visible tile is explored already)
+                tcod.screen
+                    .set_char_background(x, y, color, BackgroundFlag::Set);
+            }
         }
     }
+
+   
 
     for unit in units {
         if tcod.fov.is_in_fov(unit.x, unit.y){
@@ -175,7 +187,7 @@ fn main() {
 
     let mut units = [player, npc]; // don't forget to change the number of units in generate_map() and handle_keys() definitions
 
-    let game = structures::Game {
+    let mut game = structures::Game {
         map: generate_map(&mut units),
     };
     for y in 0..config::MAP_HEIGHT {
@@ -196,7 +208,7 @@ fn main() {
         tcod.screen.clear();
 
         let fov_recompute = previous_player_position != (units[0].x, units[0].y);
-        render(&mut tcod, &game, &units, fov_recompute);
+        render(&mut tcod, &mut game, &units, fov_recompute);
         tcod.root.flush();
  
         let player = &mut units[0];
