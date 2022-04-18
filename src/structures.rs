@@ -1,9 +1,12 @@
 use tcod::colors::*;
 use tcod::console::*;
 
+use tcod::map::{FovAlgorithm, Map as FovMap};
+
 pub struct Tcod {
     pub root: Root,
     pub screen: Offscreen,
+    pub fov: FovMap,
 }
 
 

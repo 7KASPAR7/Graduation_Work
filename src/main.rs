@@ -4,6 +4,8 @@ use rand::Rng;
 use tcod::colors::*;
 use tcod::console::*;
 
+use tcod::map::{FovAlgorithm, Map as FovMap};
+
 mod config;
 mod structures;
 
@@ -85,22 +87,34 @@ fn generate_map(units: &mut [structures::Unit; 2]) -> structures::Map {
     map
 }
 
-fn render(tcod: &mut structures::Tcod, game: &structures::Game, units: &[structures::Unit]) {
+fn render(tcod: &mut structures::Tcod, game: &structures::Game, units: &[structures::Unit], fov_recompute: bool) {
+
+    if fov_recompute {
+        // recompute FOV if needed (the player moved or something)
+        let player = &units[0];
+        tcod.fov.compute_fov(player.x, player.y, config::FOV_RADIUS, config::FOV_LIGHT_WALLS, config::FOV_ALG);
+    }
+
     for y in 0..config::MAP_HEIGHT {
         for x in 0..config::MAP_WIDTH {
+            let visible = tcod.fov.is_in_fov(x, y);
             let wall = game.map[x as usize][y as usize].is_visible;
-            if wall {
-                tcod.screen
-                    .set_char_background(x, y, config::COLOR_WALL, BackgroundFlag::Set);
-            } else {
-                tcod.screen
-                    .set_char_background(x, y, config::COLOR_GROUND, BackgroundFlag::Set);
-            }
+            let color = match (visible, wall) {
+                // outside of FoV:
+                (false, true) => config::COLOR_DARK_WALL,
+                (false, false) => config::COLOR_DARK_GROUND,
+                // inside FoV:
+                (true, true) => config::COLOR_LIGHT_WALL,
+                (true, false) => config::COLOR_LIGHT_GROUND,
+            };
+            tcod.screen.set_char_background(x, y, color, BackgroundFlag::Set);
         }
     }
 
     for unit in units {
-        unit.draw(&mut tcod.screen);
+        if tcod.fov.is_in_fov(unit.x, unit.y){
+            unit.draw(&mut tcod.screen);
+        }
     }
 
     blit(
@@ -114,23 +128,23 @@ fn render(tcod: &mut structures::Tcod, game: &structures::Game, units: &[structu
     );
 }
 
-fn handle_keys(tcod: &mut structures::Tcod, game: &structures::Game, player: &mut structures::Unit) -> bool {
+fn handle_keys(tcod: &mut structures::Tcod, game: &structures::Game, units: &mut [structures::Unit;2]) -> bool {
     use tcod::input::Key;
     use tcod::input::KeyCode::*;
 
     let key = tcod.root.wait_for_keypress(true);
+    let player = &mut units[0];
     match key {
 
         Key { code: Escape, .. } => return true, // exit game
-
+        
+        // Write in the {} some logic for player and npc moving
         Key { code: Up, .. } => player.move_by(0, -1, game),
         Key { code: Down, .. } => player.move_by(0, 1, game),
         Key { code: Left, .. } => player.move_by(-1, 0, game),
         Key { code: Right, .. } => player.move_by(1, 0, game),
 
-        _ => {
-            // write here the code for player search 
-        }
+        _ => {}
     }
     false
 }
@@ -148,32 +162,51 @@ fn main() {
 
 
     let screen = Offscreen::new(config::MAP_WIDTH, config::MAP_HEIGHT);
+        
+    let mut tcod = structures::Tcod {
+        root,
+        screen: Offscreen::new(config::MAP_WIDTH, config::MAP_HEIGHT),  
+        fov: FovMap::new(config::MAP_WIDTH, config::MAP_HEIGHT),  
+    };
 
-    let mut tcod = structures::Tcod {root, screen};
+    let player = structures::Unit::new(5, 5, '@', BLUE);
 
-    let player = structures::Unit::new(5, 5, '@', WHITE);
+    let npc = structures::Unit::new(5, 5, 'M', RED);
 
-    let npc = structures::Unit::new(5, 5, 'M', GREEN);
-
-    let mut units = [player, npc]; // don't forget to change the number of units in generate_map() definition
+    let mut units = [player, npc]; // don't forget to change the number of units in generate_map() and handle_keys() definitions
 
     let game = structures::Game {
         map: generate_map(&mut units),
     };
+    for y in 0..config::MAP_HEIGHT {
+        for x in 0..config::MAP_WIDTH {
+            tcod.fov.set(
+                x,
+                y,
+                !game.map[x as usize][y as usize].is_visible,
+                !game.map[x as usize][y as usize].collision_enabled,
+            );
+        }
+    }
+
+    let mut previous_player_position = (-1, -1);
 
     while !tcod.root.window_closed() {
         
         tcod.screen.clear();
 
-         render(&mut tcod, &game, &units);
-
-         tcod.root.flush();
+        let fov_recompute = previous_player_position != (units[0].x, units[0].y);
+        render(&mut tcod, &game, &units, fov_recompute);
+        tcod.root.flush();
  
-         let player = &mut units[0];
-         let exit = handle_keys(&mut tcod, &game, player);
-         if exit {
+        let player = &mut units[0];
+
+        previous_player_position = (player.x, player.y);
+
+        let exit = handle_keys(&mut tcod, &game, &mut units);
+        if exit {
              break;
-         }
+        }
     }
 }
 
