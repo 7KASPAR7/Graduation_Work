@@ -4,7 +4,7 @@ use rand::Rng;
 use tcod::colors::*;
 use tcod::console::*;
 
-use tcod::map::{FovAlgorithm, Map as FovMap};
+use tcod::map::{Map as FovMap};
 
 mod config;
 mod structures;
@@ -173,7 +173,7 @@ fn main() {
         .init();
 
 
-    let screen = Offscreen::new(config::MAP_WIDTH, config::MAP_HEIGHT);
+    //let screen = Offscreen::new(config::MAP_WIDTH, config::MAP_HEIGHT);
         
     let mut tcod = structures::Tcod {
         root,

@@ -1,6 +1,6 @@
 use tcod::colors::*;
 
-use tcod::map::{FovAlgorithm, Map as FovMap};
+use tcod::map::{FovAlgorithm};
 
 
 // actual size of the window
