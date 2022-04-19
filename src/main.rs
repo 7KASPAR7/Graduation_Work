@@ -174,6 +174,38 @@ fn render(tcod: &mut structures::Tcod, game: &mut structures::Game, units: &[str
             format!("HP: {}/{} ", attackable.hp, attackable.max_hp),
         );
     }
+    
+    // prepare to render the GUI panel
+tcod.panel.set_default_background(BLACK);
+tcod.panel.clear();
+
+let mut y = config::MESSAGES_HEIGHT as i32;
+for &(ref msg, color) in game.messages.iter().rev() {
+    let msg_height = tcod.panel.get_height_rect(config::MESSAGES_X, y, config::MESSAGES_WIDTH, 0, msg);
+    y -= msg_height;
+    if y < 0 {
+        break;
+    }
+    tcod.panel.set_default_foreground(color);
+    tcod.panel.print_rect(config::MESSAGES_X, y, config::MESSAGES_WIDTH, 0, msg);
+}
+
+
+// show the player's stats
+let hp = units[config::PLAYER].attackable.map_or(0, |f| f.hp);
+let max_hp = units[config::PLAYER].attackable.map_or(0, |f| f.max_hp);
+render_bar(&mut tcod.panel, 1, 1, config::BAR_WIDTH, "HP", hp, max_hp, LIGHT_RED, DARKER_RED);
+
+// blit the contents of `panel` to the root console
+blit(
+    &tcod.panel,
+    (0, 0),
+    (config::SCREEN_WIDTH, config::PANEL_HEIGHT),
+    &mut tcod.root,
+    (0, config::PANEL_Y),
+    1.0,
+    1.0,
+);
 
 }
 
@@ -184,7 +216,7 @@ fn move_by(id: usize, dx: i32, dy: i32, map: &structures::Map, units: &mut [stru
     }
 }
 
-fn handle_keys(tcod: &mut structures::Tcod, game: &structures::Game, units: &mut [structures::Unit]) -> structures::PlayerAction {
+fn handle_keys(tcod: &mut structures::Tcod, game: &mut structures::Game, units: &mut [structures::Unit]) -> structures::PlayerAction {
     use tcod::input::Key;
     use tcod::input::KeyCode::*;
     use structures::PlayerAction::*;
@@ -220,7 +252,7 @@ fn handle_keys(tcod: &mut structures::Tcod, game: &structures::Game, units: &mut
 }
     
 
-fn player_move_or_attack(dx: i32, dy: i32, game: &structures::Game, units: &mut [structures::Unit]) {
+fn player_move_or_attack(dx: i32, dy: i32, game: &mut structures::Game, units: &mut [structures::Unit]) {
     // the coordinates the player is moving to/attacking
     let x = units[config::PLAYER].x + dx;
     let y = units[config::PLAYER].y + dy;
@@ -232,7 +264,7 @@ fn player_move_or_attack(dx: i32, dy: i32, game: &structures::Game, units: &mut 
     match target_id {
         Some(target_id) => {
             let (player, target) = mut_two(config::PLAYER, target_id, units);
-            player.attack(target);
+            player.attack(target, game);
         }
         None => {
             move_by(config::PLAYER, dx, dy, &game.map, units);
@@ -251,7 +283,7 @@ fn monster_move(id: usize, player_x: i32, player_y: i32, map: &structures::Map, 
     move_by(id, dx, dy, map, units);
 }
 
-fn ai_turn(id: usize, tcod: &structures::Tcod, game: &structures::Game, units: &mut [structures::Unit]) {
+fn ai_turn(id: usize, tcod: &structures::Tcod, game: &mut structures::Game, units: &mut [structures::Unit]) {
     let (monster_x, monster_y) = units[id].loc();
     if tcod.fov.is_in_fov(monster_x, monster_y) {
         if units[id].get_distance_to(&units[config::PLAYER]) >= 2.0 {
@@ -260,7 +292,7 @@ fn ai_turn(id: usize, tcod: &structures::Tcod, game: &structures::Game, units: &
         } 
         else if units[config::PLAYER].attackable.map_or(false, |a| a.hp > 0) {
             let (monster, player) = mut_two(id, config::PLAYER, units);
-            monster.attack(player);
+            monster.attack(player, game);
         }
     }
 }
@@ -274,6 +306,27 @@ fn mut_two<T>(first_index: usize, second_index: usize, items: &mut [T]) -> (&mut
     } else {
         (&mut second_slice[0], &mut first_slice[second_index])
     }
+}
+
+fn render_bar(panel: &mut Offscreen, x: i32, y: i32, total_width: i32, name: &str, value: i32, maximum: i32, bar_color: Color, back_color: Color) {
+    let bar_width = (value as f32 / maximum as f32 * total_width as f32) as i32;
+
+    panel.set_default_background(back_color);
+    panel.rect(x, y, total_width, 1, false, BackgroundFlag::Screen);
+
+    panel.set_default_background(bar_color);
+    if bar_width > 0 {
+        panel.rect(x, y, bar_width, 1, false, BackgroundFlag::Screen);
+    }
+
+    panel.set_default_foreground(WHITE);
+    panel.print_ex(
+        x + total_width / 2,
+        y,
+        BackgroundFlag::None,
+        TextAlignment::Center,
+        &format!("{}: {}/{}", name, value, maximum),
+    );
 }
 
 fn main() {
@@ -292,7 +345,10 @@ fn main() {
     let mut tcod = structures::Tcod {
         root,
         screen: Offscreen::new(config::MAP_WIDTH, config::MAP_HEIGHT),  
-        fov: FovMap::new(config::MAP_WIDTH, config::MAP_HEIGHT),  
+        fov: FovMap::new(config::MAP_WIDTH, config::MAP_HEIGHT), 
+        panel: Offscreen::new(config::SCREEN_WIDTH, config::PANEL_HEIGHT),
+        key: Default::default(),
+        mouse: Default::default(), 
     };
 
     let mut player = structures::Unit::new(5, 5, '@', BLUE, "Player", true);
@@ -304,6 +360,7 @@ fn main() {
 
     let mut game = structures::Game {
         map: generate_map(&mut units),
+        messages: structures::Messages::new(),
     };
     for y in 0..config::MAP_HEIGHT {
         for x in 0..config::MAP_WIDTH {
@@ -316,6 +373,11 @@ fn main() {
         }
     }
 
+    game.messages.add(
+    "Welcome stranger! Prepare to perish in the Tombs of the Ancient Kings.",
+    RED,
+);
+
     let mut previous_player_position = (-1, -1);
 
     while !tcod.root.window_closed() {
@@ -327,14 +389,14 @@ fn main() {
         tcod.root.flush();
 
         previous_player_position = units[config::PLAYER].loc();
-        let player_action = handle_keys(&mut tcod, &game, &mut units);
+        let player_action = handle_keys(&mut tcod, &mut game, &mut units);
         if player_action == structures::PlayerAction::Exit {
             break;
         }
         if units[config::PLAYER].alive && player_action != structures::PlayerAction::DidnotTakeTurn {
             for id in 0..units.len() {
                 if units[id].ai.is_some() {
-                    ai_turn(id, &tcod, &game, &mut units);
+                    ai_turn(id, &tcod, &mut game, &mut units);
                 }
             }
             for unit in &units {

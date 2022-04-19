@@ -3,10 +3,15 @@ use tcod::console::*;
 
 use tcod::map::{Map as FovMap};
 
+use tcod::input::{Key, Mouse};
+
 pub struct Tcod {
     pub root: Root,
     pub screen: Offscreen,
     pub fov: FovMap,
+    pub panel: Offscreen,
+    pub key: Key,
+    pub mouse: Mouse,
 }
 
 
@@ -115,7 +120,7 @@ impl Unit {
         ((dx*dx + dy*dy) as f32).sqrt()
     }
 
-    pub fn get_damage(&mut self, damage: i32) {
+    pub fn get_damage(&mut self, damage: i32, game: &mut Game) {
         if let Some(attackable) = self.attackable.as_mut() {
             if damage > 0 {
                 attackable.hp -= damage;
@@ -124,19 +129,19 @@ impl Unit {
         if let Some(attackable) = self.attackable {
             if attackable.hp <= 0 {
                 self.alive = false;
-                attackable.on_death.callback(self);
+                attackable.on_death.callback(self, game);
             }
         }
     }
 
-    pub fn attack(&mut self, target: &mut Unit) {
+    pub fn attack(&mut self, target: &mut Unit, game: &mut Game) {
         let damage = self.attackable.map_or(0, |a| a.damage) - target.attackable.map_or(0, |a| a.armor);
         if damage > 0 {
-            println!("{} dealt {} damage to {}", self.name, damage, target.name);
-            target.get_damage(damage);
+            game.messages.add(format!("{} dealt {} damage to {}", self.name, damage, target.name), WHITE);
+            target.get_damage(damage, game);
         }
         else {
-            println!("{}'s armor is stronger than {}'s damage", target.name, self.name);
+            game.messages.add(format!("{}'s armor is stronger than {}'s damage", target.name, self.name), WHITE);
         }
 
 
@@ -149,6 +154,7 @@ pub type Map = Vec<Vec<Tile>>;
 
 pub struct Game{
     pub map: Map,
+    pub messages: Messages,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -179,34 +185,52 @@ pub enum DeathCallback {
 }
 
 impl DeathCallback {
-    fn callback(self, unit: &mut Unit) {
+    fn callback(self, unit: &mut Unit, game: &mut Game) {
         use DeathCallback::*;
-        let callback: fn(&mut Unit) = match self {
+        let callback = match self {
             Player => player_death,
             Monster => monster_death,
         };
-        callback(unit);
+        callback(unit, game);
     }
 }
 
 
-fn player_death(player: &mut Unit) {
+fn player_death(player: &mut Unit, game: &mut Game) {
     // the game ended!
-    println!("You died!");
+    game.messages.add("You died!", RED);
 
     // for added effect, transform the player into a corpse!
     player.symbol = '%';
     player.color = DARK_RED;
 }
 
-fn monster_death(monster: &mut Unit) {
+fn monster_death(monster: &mut Unit, game: &mut Game) {
     // transform it into a nasty corpse! it doesn't block, can't be
     // attacked and doesn't move
-    println!("{} is dead!", monster.name);
+    game.messages.add(format!("{} is dead!", monster.name), ORANGE);
     monster.symbol = '%';
     monster.color = DARK_RED;
     monster.blocks = false;
     monster.attackable = None;
     monster.ai = None;
     monster.name = format!("remains of {}", monster.name);
+}
+
+pub struct Messages {
+    messages: Vec<(String, Color)>,
+}
+
+impl Messages {
+    pub fn new() -> Self {
+        Self { messages: vec![] }
+    }
+
+    pub fn add<T: Into<String>>(&mut self, message: T, color: Color) {
+        self.messages.push((message.into(), color));
+    }
+
+    pub fn iter(&self) -> impl DoubleEndedIterator<Item = &(String, Color)> {
+        self.messages.iter()
+    }
 }
