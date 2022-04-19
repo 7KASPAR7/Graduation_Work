@@ -3,15 +3,11 @@ use tcod::console::*;
 
 use tcod::map::{Map as FovMap};
 
-use tcod::input::{Key, Mouse};
-
 pub struct Tcod {
     pub root: Root,
     pub screen: Offscreen,
     pub fov: FovMap,
     pub panel: Offscreen,
-    pub key: Key,
-    pub mouse: Mouse,
 }
 
 

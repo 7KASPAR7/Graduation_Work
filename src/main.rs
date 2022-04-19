@@ -347,8 +347,6 @@ fn main() {
         screen: Offscreen::new(config::MAP_WIDTH, config::MAP_HEIGHT),  
         fov: FovMap::new(config::MAP_WIDTH, config::MAP_HEIGHT), 
         panel: Offscreen::new(config::SCREEN_WIDTH, config::PANEL_HEIGHT),
-        key: Default::default(),
-        mouse: Default::default(), 
     };
 
     let mut player = structures::Unit::new(5, 5, '@', BLUE, "Player", true);
