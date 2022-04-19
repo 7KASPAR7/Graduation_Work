@@ -19,11 +19,14 @@ fn spawn_units(room: structures::Rect, map: &structures::Map, units: &mut Vec<st
             let mut monster;
             if rand::random::<f32>() < 0.75 {
                 monster = structures::Unit::new(x, y, 'O', DESATURATED_PURPLE, "Orc", true);
+                monster.attackable = Some(structures::Attackable{max_hp: 50, hp: 50, armor: 5, damage: 12, on_death: structures::DeathCallback::Monster})
             } 
             else {
                 monster = structures::Unit::new(x, y, 'T', DESATURATED_ORANGE, "Troll", true);
+                monster.attackable = Some(structures::Attackable{max_hp: 30, hp: 30, armor: 2, damage: 15, on_death: structures::DeathCallback::Monster})
             }
             monster.alive = true;
+            monster.ai = Some(structures::Ai::Basic);
             units.push(monster);
         }
     }
@@ -83,14 +86,14 @@ fn generate_map(units: &mut Vec<structures::Unit>) -> structures::Map {
 
             // center coordinates of the new room
             let (new_x, new_y) = new_room.center();
-            println!("new {}, {}", new_x, new_y);
+            // println!("new {}, {}", new_x, new_y);
 
             if rooms.is_empty() {
                 units[config::PLAYER].set_loc(new_x, new_y);
             }  
             else {
                 let (prev_x, prev_y) = rooms[rooms.len() - 1].center();
-                println!("prev {}, {}", prev_x, prev_y);
+                // println!("prev {}, {}", prev_x, prev_y);
 
                 if rand::random() {
                     create_hor_tunnel(prev_x, new_x, prev_y, &mut map);
@@ -140,11 +143,12 @@ fn render(tcod: &mut structures::Tcod, game: &mut structures::Game, units: &[str
             }
         }
     }
-
-   
-
-    for unit in units {
-        if tcod.fov.is_in_fov(unit.x, unit.y){
+    let mut to_draw: Vec<_> = units.iter().collect();
+    // sort so that non-blocknig objects come first
+    to_draw.sort_by(|o1, o2| { o1.blocks.cmp(&o2.blocks) });
+    // draw the objects in the list
+    for unit in &to_draw {
+        if tcod.fov.is_in_fov(unit.x, unit.y) {
             unit.draw(&mut tcod.screen);
         }
     }
@@ -158,6 +162,19 @@ fn render(tcod: &mut structures::Tcod, game: &mut structures::Game, units: &[str
         1.0,
         1.0,
     );
+
+    
+    tcod.root.set_default_foreground(WHITE);
+    if let Some(attackable) = units[config::PLAYER].attackable {
+        tcod.root.print_ex(
+            1,
+            config::SCREEN_HEIGHT - 2,
+            BackgroundFlag::None,
+            TextAlignment::Left,
+            format!("HP: {}/{} ", attackable.hp, attackable.max_hp),
+        );
+    }
+
 }
 
 fn move_by(id: usize, dx: i32, dy: i32, map: &structures::Map, units: &mut [structures::Unit]) {
@@ -209,15 +226,13 @@ fn player_move_or_attack(dx: i32, dy: i32, game: &structures::Game, units: &mut 
     let y = units[config::PLAYER].y + dy;
 
     // try to find an attackable object there
-    let target_id = units.iter().position(|unit| unit.loc() == (x, y));
+    let target_id = units.iter().position(|unit| unit.attackable.is_some() && unit.loc() == (x, y));
 
     // attack if target found, move otherwise
     match target_id {
         Some(target_id) => {
-            println!(
-                "You tried to attack {}!",
-                units[target_id].name
-            );
+            let (player, target) = mut_two(config::PLAYER, target_id, units);
+            player.attack(target);
         }
         None => {
             move_by(config::PLAYER, dx, dy, &game.map, units);
@@ -225,6 +240,41 @@ fn player_move_or_attack(dx: i32, dy: i32, game: &structures::Game, units: &mut 
     }
 }
 
+fn monster_move(id: usize, player_x: i32, player_y: i32, map: &structures::Map, units: &mut [structures::Unit]) {
+    let dx = player_x - units[id].x;
+    let dy = player_y - units[id].y;
+    let distance = ((dx*dx + dy*dy) as f32).sqrt();
+
+    let dx = (dx as f32 / distance).round() as i32;
+    let dy = (dy as f32 / distance).round() as i32;
+
+    move_by(id, dx, dy, map, units);
+}
+
+fn ai_turn(id: usize, tcod: &structures::Tcod, game: &structures::Game, units: &mut [structures::Unit]) {
+    let (monster_x, monster_y) = units[id].loc();
+    if tcod.fov.is_in_fov(monster_x, monster_y) {
+        if units[id].get_distance_to(&units[config::PLAYER]) >= 2.0 {
+            let (player_x, player_y) = units[config::PLAYER].loc();
+            monster_move(id, player_x, player_y, &game.map, units);
+        } 
+        else if units[config::PLAYER].attackable.map_or(false, |a| a.hp > 0) {
+            let (monster, player) = mut_two(id, config::PLAYER, units);
+            monster.attack(player);
+        }
+    }
+}
+
+fn mut_two<T>(first_index: usize, second_index: usize, items: &mut [T]) -> (&mut T, &mut T) {
+    assert!(first_index != second_index);
+    let split_at_index = cmp::max(first_index, second_index);
+    let (first_slice, second_slice) = items.split_at_mut(split_at_index);
+    if first_index < second_index {
+        (&mut first_slice[first_index], &mut second_slice[0])
+    } else {
+        (&mut second_slice[0], &mut first_slice[second_index])
+    }
+}
 
 fn main() {
     tcod::system::set_fps(config::LIMIT_FPS);
@@ -248,6 +298,7 @@ fn main() {
     let mut player = structures::Unit::new(5, 5, '@', BLUE, "Player", true);
 
     player.alive = true;
+    player.attackable = Some(structures::Attackable{max_hp: 100, hp: 100, armor: 10, damage: 10, on_death: structures::DeathCallback::Player});
 
     let mut units = vec![player]; // don't forget to change the number of units in generate_map() and handle_keys() definitions
 
@@ -281,6 +332,11 @@ fn main() {
             break;
         }
         if units[config::PLAYER].alive && player_action != structures::PlayerAction::DidnotTakeTurn {
+            for id in 0..units.len() {
+                if units[id].ai.is_some() {
+                    ai_turn(id, &tcod, &game, &mut units);
+                }
+            }
             for unit in &units {
                 // only if unitt is not player
                 if (unit as *const _) != (&units[config::PLAYER] as *const _) {

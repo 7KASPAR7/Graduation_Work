@@ -16,7 +16,7 @@ pub const LIMIT_FPS: i32 = 20; // 20 frames-per-second maximum
 pub const ROOM_MAX_SIZE: i32 = 10;
 pub const ROOM_MIN_SIZE: i32 = 6;
 pub const MAX_ROOMS: i32 = 15;
-pub const MAX_ROOM_MONSTERS: i32 = 3;
+pub const MAX_ROOM_MONSTERS: i32 = 2;
 
 
 pub const COLOR_LIGHT_WALL: Color = Color {r: 106, g: 10, b: 171};

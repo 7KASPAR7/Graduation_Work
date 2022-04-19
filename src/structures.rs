@@ -78,11 +78,13 @@ pub struct Unit {
     pub name: String,
     pub blocks: bool,
     pub alive: bool,
+    pub attackable: Option<Attackable>,
+    pub ai: Option<Ai>,
 }
 
 impl Unit {
     pub fn new(x: i32, y: i32, symbol: char, color: Color, name: &str, blocks: bool) -> Self{
-        Unit{x, y, symbol, color, name: name.into(), blocks, alive: false}
+        Unit{x, y, symbol, color, name: name.into(), blocks, alive: false, attackable: None, ai: None}
     }
 
     // pub fn move_by(&mut self, x_offset: i32, y_offset: i32, game: &Game) {
@@ -105,6 +107,40 @@ impl Unit {
         self.x = x;
         self.y = y;
     }
+
+    pub fn get_distance_to(&self, target: &Unit) -> f32 {
+        let dx = target.x - self.x;
+        let dy = target.y - self.y;
+
+        ((dx*dx + dy*dy) as f32).sqrt()
+    }
+
+    pub fn get_damage(&mut self, damage: i32) {
+        if let Some(attackable) = self.attackable.as_mut() {
+            if damage > 0 {
+                attackable.hp -= damage;
+            }
+        }
+        if let Some(attackable) = self.attackable {
+            if attackable.hp <= 0 {
+                self.alive = false;
+                attackable.on_death.callback(self);
+            }
+        }
+    }
+
+    pub fn attack(&mut self, target: &mut Unit) {
+        let damage = self.attackable.map_or(0, |a| a.damage) - target.attackable.map_or(0, |a| a.armor);
+        if damage > 0 {
+            println!("{} dealt {} damage to {}", self.name, damage, target.name);
+            target.get_damage(damage);
+        }
+        else {
+            println!("{}'s armor is stronger than {}'s damage", target.name, self.name);
+        }
+
+
+    }
 }
 
 
@@ -120,4 +156,57 @@ pub enum PlayerAction {
     TookTurn,
     DidnotTakeTurn,
     Exit,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Attackable {
+    pub max_hp: i32,
+    pub hp: i32,
+    pub armor: i32,
+    pub damage: i32,
+    pub on_death: DeathCallback,
+}
+
+#[derive(Clone, Debug, PartialEq)] 
+pub enum Ai {
+    Basic,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum DeathCallback {
+    Player,
+    Monster,
+}
+
+impl DeathCallback {
+    fn callback(self, unit: &mut Unit) {
+        use DeathCallback::*;
+        let callback: fn(&mut Unit) = match self {
+            Player => player_death,
+            Monster => monster_death,
+        };
+        callback(unit);
+    }
+}
+
+
+fn player_death(player: &mut Unit) {
+    // the game ended!
+    println!("You died!");
+
+    // for added effect, transform the player into a corpse!
+    player.symbol = '%';
+    player.color = DARK_RED;
+}
+
+fn monster_death(monster: &mut Unit) {
+    // transform it into a nasty corpse! it doesn't block, can't be
+    // attacked and doesn't move
+    println!("{} is dead!", monster.name);
+    monster.symbol = '%';
+    monster.color = DARK_RED;
+    monster.blocks = false;
+    monster.attackable = None;
+    monster.ai = None;
+    monster.name = format!("remains of {}", monster.name);
 }
