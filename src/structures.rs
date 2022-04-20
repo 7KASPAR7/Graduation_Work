@@ -71,7 +71,7 @@ impl Rect{
 
 
 #[derive(Debug)]
-pub struct Unit {
+pub struct Object {
     pub x: i32,
     pub y: i32,
     pub symbol: char,
@@ -81,11 +81,12 @@ pub struct Unit {
     pub alive: bool,
     pub attackable: Option<Attackable>,
     pub ai: Option<Ai>,
+    pub item: Option<Item>,
 }
 
-impl Unit {
-    pub fn new(x: i32, y: i32, symbol: char, color: Color, name: &str, blocks: bool) -> Self{
-        Unit{x, y, symbol, color, name: name.into(), blocks, alive: false, attackable: None, ai: None}
+impl Object {
+    pub fn new(x: i32, y: i32, symbol: char, color: Color, name: &str, blocks: bool) -> Self {
+        Object{x, y, symbol, color, name: name.into(), blocks, alive: false, attackable: None, ai: None, item: None}
     }
 
     // pub fn move_by(&mut self, x_offset: i32, y_offset: i32, game: &Game) {
@@ -109,7 +110,7 @@ impl Unit {
         self.y = y;
     }
 
-    pub fn get_distance_to(&self, target: &Unit) -> f32 {
+    pub fn get_distance_to(&self, target: &Object) -> f32 {
         let dx = target.x - self.x;
         let dy = target.y - self.y;
 
@@ -130,7 +131,7 @@ impl Unit {
         }
     }
 
-    pub fn attack(&mut self, target: &mut Unit, game: &mut Game) {
+    pub fn attack(&mut self, target: &mut Object, game: &mut Game) {
         let damage = self.attackable.map_or(0, |a| a.damage) - target.attackable.map_or(0, |a| a.armor);
         if damage > 0 {
             game.messages.add(format!("{} dealt {} damage to {}", self.name, damage, target.name), WHITE);
@@ -151,6 +152,7 @@ pub type Map = Vec<Vec<Tile>>;
 pub struct Game{
     pub map: Map,
     pub messages: Messages,
+    pub inventory: Vec<Object>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -181,18 +183,18 @@ pub enum DeathCallback {
 }
 
 impl DeathCallback {
-    fn callback(self, unit: &mut Unit, game: &mut Game) {
+    fn callback(self, object: &mut Object, game: &mut Game) {
         use DeathCallback::*;
         let callback = match self {
             Player => player_death,
             Monster => monster_death,
         };
-        callback(unit, game);
+        callback(object, game);
     }
 }
 
 
-fn player_death(player: &mut Unit, game: &mut Game) {
+fn player_death(player: &mut Object, game: &mut Game) {
     // the game ended!
     game.messages.add("You died!", RED);
 
@@ -201,7 +203,7 @@ fn player_death(player: &mut Unit, game: &mut Game) {
     player.color = DARK_RED;
 }
 
-fn monster_death(monster: &mut Unit, game: &mut Game) {
+fn monster_death(monster: &mut Object, game: &mut Game) {
     // transform it into a nasty corpse! it doesn't block, can't be
     // attacked and doesn't move
     game.messages.add(format!("{} is dead!", monster.name), ORANGE);
@@ -229,4 +231,9 @@ impl Messages {
     pub fn iter(&self) -> impl DoubleEndedIterator<Item = &(String, Color)> {
         self.messages.iter()
     }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum Item {
+    Heal,
 }

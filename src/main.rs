@@ -9,35 +9,69 @@ use tcod::map::{Map as FovMap};
 mod config;
 mod structures;
 
-fn spawn_units(room: structures::Rect, map: &structures::Map, units: &mut Vec<structures::Unit>) {
+fn spawn_objects(room: structures::Rect, map: &structures::Map, objects: &mut Vec<structures::Object>) {
     let monster_num = rand::thread_rng().gen_range(0..config::MAX_ROOM_MONSTERS + 1);
     
     for _ in 0..monster_num {
         let x = rand::thread_rng().gen_range(room.x1..room.x2+1);
         let y = rand::thread_rng().gen_range(room.y1..room.y2+1);
-        if !is_blocked(x, y, map, units) {
+        if !is_blocked(x, y, map, objects) {
             let mut monster;
             if rand::random::<f32>() < 0.75 {
-                monster = structures::Unit::new(x, y, 'O', DESATURATED_PURPLE, "Orc", true);
+                monster = structures::Object::new(x, y, 'O', DESATURATED_PURPLE, "Orc", true);
                 monster.attackable = Some(structures::Attackable{max_hp: 50, hp: 50, armor: 5, damage: 12, on_death: structures::DeathCallback::Monster})
             } 
             else {
-                monster = structures::Unit::new(x, y, 'T', DESATURATED_ORANGE, "Troll", true);
+                monster = structures::Object::new(x, y, 'T', DESATURATED_ORANGE, "Troll", true);
                 monster.attackable = Some(structures::Attackable{max_hp: 30, hp: 30, armor: 2, damage: 15, on_death: structures::DeathCallback::Monster})
             }
             monster.alive = true;
             monster.ai = Some(structures::Ai::Basic);
-            units.push(monster);
+            objects.push(monster);
         }
     }
 
+    let num_items = rand::thread_rng().gen_range(0..config::MAX_ROOM_ITEMS + 1);
+
+    for _ in 0..num_items {
+        // choose random spot for this item
+        let x = rand::thread_rng().gen_range(room.x1 + 1..room.x2);
+        let y = rand::thread_rng().gen_range(room.y1 + 1..room.y2);
+
+    // only place it if the tile is not blocked
+    if !is_blocked(x, y, map, objects) {
+        // create a healing potion
+        let mut item = structures::Object::new(x, y, '!',  VIOLET, "healing potion", false);
+        item.item = Some(structures::Item::Heal);
+        objects.push(item);
+    }
 }
 
-fn is_blocked(x: i32, y: i32, map: &structures::Map, units: &[structures::Unit]) -> bool {
+}
+
+/// add to the player's inventory and remove from the map
+fn pick_item_up(object_id: usize, game: &mut structures::Game, objects: &mut Vec<structures::Object>) {
+    if game.inventory.len() >= 26 {
+        game.messages.add(
+            format!(
+                "Your inventory is full, cannot pick up {}.",
+                objects[object_id].name
+            ),
+            RED,
+        );
+    } else {
+        let item = objects.swap_remove(object_id);
+        game.messages
+            .add(format!("You picked up a {}!", item.name), GREEN);
+        game.inventory.push(item);
+    }
+}
+
+fn is_blocked(x: i32, y: i32, map: &structures::Map, objects: &[structures::Object]) -> bool {
     if map[x as usize][y as usize].collision_enabled {
         return true;
     }
-    units.iter().any(|unit| unit.blocks && unit.loc() == (x,y))
+    objects.iter().any(|object| object.blocks && object.loc() == (x,y))
 }
 
 fn create_room(room: structures::Rect, map: &mut structures::Map) {
@@ -60,7 +94,7 @@ fn create_ver_tunnel(x: i32, y1: i32, y2: i32, map: &mut structures::Map) {
     }
 }
 
-fn generate_map(units: &mut Vec<structures::Unit>) -> structures::Map {
+fn generate_map(objects: &mut Vec<structures::Object>) -> structures::Map {
 
     let mut map = vec![vec![structures::Tile::wall(); config::MAP_HEIGHT as usize]; config::MAP_WIDTH as usize];
     
@@ -82,14 +116,14 @@ fn generate_map(units: &mut Vec<structures::Unit>) -> structures::Map {
 
             create_room(new_room, &mut map);
 
-            spawn_units(new_room, &map, units);
+            spawn_objects(new_room, &map, objects);
 
             // center coordinates of the new room
             let (new_x, new_y) = new_room.center();
             // println!("new {}, {}", new_x, new_y);
 
             if rooms.is_empty() {
-                units[config::PLAYER].set_loc(new_x, new_y);
+                objects[config::PLAYER].set_loc(new_x, new_y);
             }  
             else {
                 let (prev_x, prev_y) = rooms[rooms.len() - 1].center();
@@ -110,11 +144,10 @@ fn generate_map(units: &mut Vec<structures::Unit>) -> structures::Map {
     map
 }
 
-fn render(tcod: &mut structures::Tcod, game: &mut structures::Game, units: &[structures::Unit], fov_recompute: bool) {
+fn render(tcod: &mut structures::Tcod, game: &mut structures::Game, objects: &[structures::Object], fov_recompute: bool) {
 
     if fov_recompute {
-        // recompute FOV if needed (the player moved or something)
-        let player = &units[config::PLAYER];
+        let player = &objects[config::PLAYER];
         tcod.fov.compute_fov(player.x, player.y, config::FOV_RADIUS, config::FOV_LIGHT_WALLS, config::FOV_ALG);
     }
 
@@ -123,33 +156,28 @@ fn render(tcod: &mut structures::Tcod, game: &mut structures::Game, units: &[str
             let visible = tcod.fov.is_in_fov(x, y);
             let wall = game.map[x as usize][y as usize].is_visible;
             let color = match (visible, wall) {
-                // outside of field of view:
                 (false, true) => config::COLOR_DARK_WALL,
                 (false, false) => config::COLOR_DARK_GROUND,
-                // inside fov:
+
                 (true, true) => config::COLOR_LIGHT_WALL,
                 (true, false) => config::COLOR_LIGHT_GROUND,
             };
 
             let explored = &mut game.map[x as usize][y as usize].is_explored;
             if visible {
-                // since it's visible, explore it
                 *explored = true;
             }
             if *explored {
-                // show explored tiles only (any visible tile is explored already)
                 tcod.screen
                     .set_char_background(x, y, color, BackgroundFlag::Set);
             }
         }
     }
-    let mut to_draw: Vec<_> = units.iter().collect();
-    // sort so that non-blocknig objects come first
+    let mut to_draw: Vec<_> = objects.iter().collect();
     to_draw.sort_by(|o1, o2| { o1.blocks.cmp(&o2.blocks) });
-    // draw the objects in the list
-    for unit in &to_draw {
-        if tcod.fov.is_in_fov(unit.x, unit.y) {
-            unit.draw(&mut tcod.screen);
+    for object in &to_draw {
+        if tcod.fov.is_in_fov(object.x, object.y) {
+            object.draw(&mut tcod.screen);
         }
     }
 
@@ -165,7 +193,7 @@ fn render(tcod: &mut structures::Tcod, game: &mut structures::Game, units: &[str
 
     
     tcod.root.set_default_foreground(WHITE);
-    if let Some(attackable) = units[config::PLAYER].attackable {
+    if let Some(attackable) = objects[config::PLAYER].attackable {
         tcod.root.print_ex(
             1,
             config::SCREEN_HEIGHT - 2,
@@ -190,13 +218,10 @@ for &(ref msg, color) in game.messages.iter().rev() {
     tcod.panel.print_rect(config::MESSAGES_X, y, config::MESSAGES_WIDTH, 0, msg);
 }
 
-
-// show the player's stats
-let hp = units[config::PLAYER].attackable.map_or(0, |f| f.hp);
-let max_hp = units[config::PLAYER].attackable.map_or(0, |f| f.max_hp);
+let hp = objects[config::PLAYER].attackable.map_or(0, |f| f.hp);
+let max_hp = objects[config::PLAYER].attackable.map_or(0, |f| f.max_hp);
 render_bar(&mut tcod.panel, 1, 1, config::BAR_WIDTH, "HP", hp, max_hp, LIGHT_RED, DARKER_RED);
 
-// blit the contents of `panel` to the root console
 blit(
     &tcod.panel,
     (0, 0),
@@ -209,41 +234,53 @@ blit(
 
 }
 
-fn move_by(id: usize, dx: i32, dy: i32, map: &structures::Map, units: &mut [structures::Unit]) {
-    let (x, y) = units[id].loc();
-    if !is_blocked(x + dx, y + dy, map, units) {
-        units[id].set_loc(x + dx, y + dy);
+fn move_by(id: usize, dx: i32, dy: i32, map: &structures::Map, objects: &mut [structures::Object]) {
+    let (x, y) = objects[id].loc();
+    if !is_blocked(x + dx, y + dy, map, objects) {
+        objects[id].set_loc(x + dx, y + dy);
     }
 }
 
-fn handle_keys(tcod: &mut structures::Tcod, game: &mut structures::Game, units: &mut [structures::Unit]) -> structures::PlayerAction {
+fn handle_keys(tcod: &mut structures::Tcod, game: &mut structures::Game, objects: &mut Vec<structures::Object>) -> structures::PlayerAction {
     use tcod::input::Key;
     use tcod::input::KeyCode::*;
     use structures::PlayerAction::*;
 
     let key = tcod.root.wait_for_keypress(true);
-    let player_alive = units[config::PLAYER].alive;
+    let player_alive = objects[config::PLAYER].alive;
 
     match (key, key.text(), player_alive) {
 
+        
+
         (Key { code: Escape, .. }, _, _) => Exit, // exit game
         
-        // Write in the {} some logic for player and npc moving
         (Key { code: Up, .. }, _, true) => {
-            player_move_or_attack(0, -1, game, units);
+            player_move_or_attack(0, -1, game, objects);
             TookTurn
         },
         (Key { code: Down, .. }, _, true) => {
-            player_move_or_attack(0, 1, game, units);
+            player_move_or_attack(0, 1, game, objects);
             TookTurn
         },
         (Key { code: Left, .. }, _, true) => {
-            player_move_or_attack(-1, 0, game, units);
+            player_move_or_attack(-1, 0, game, objects);
             TookTurn
         },
         (Key { code: Right, .. }, _, true) => {
-            player_move_or_attack(1, 0, game, units);
+            player_move_or_attack(1, 0, game, objects);
             TookTurn
+        },
+        
+        (Key { code: Number1, .. }, _, true) => {
+            //println!("Tried to pick up");
+            let item_id = objects
+                .iter()
+                .position(|object| object.loc() == objects[config::PLAYER].loc() && object.item.is_some());
+            if let Some(item_id) = item_id {
+                pick_item_up(item_id, game, objects);
+            }
+            DidnotTakeTurn
         },
 
         _ => DidnotTakeTurn,
@@ -252,46 +289,46 @@ fn handle_keys(tcod: &mut structures::Tcod, game: &mut structures::Game, units: 
 }
     
 
-fn player_move_or_attack(dx: i32, dy: i32, game: &mut structures::Game, units: &mut [structures::Unit]) {
+fn player_move_or_attack(dx: i32, dy: i32, game: &mut structures::Game, objects: &mut [structures::Object]) {
     // the coordinates the player is moving to/attacking
-    let x = units[config::PLAYER].x + dx;
-    let y = units[config::PLAYER].y + dy;
+    let x = objects[config::PLAYER].x + dx;
+    let y = objects[config::PLAYER].y + dy;
 
     // try to find an attackable object there
-    let target_id = units.iter().position(|unit| unit.attackable.is_some() && unit.loc() == (x, y));
+    let target_id = objects.iter().position(|object| object.attackable.is_some() && object.loc() == (x, y));
 
     // attack if target found, move otherwise
     match target_id {
         Some(target_id) => {
-            let (player, target) = mut_two(config::PLAYER, target_id, units);
+            let (player, target) = mut_two(config::PLAYER, target_id, objects);
             player.attack(target, game);
         }
         None => {
-            move_by(config::PLAYER, dx, dy, &game.map, units);
+            move_by(config::PLAYER, dx, dy, &game.map, objects);
         }
     }
 }
 
-fn monster_move(id: usize, player_x: i32, player_y: i32, map: &structures::Map, units: &mut [structures::Unit]) {
-    let dx = player_x - units[id].x;
-    let dy = player_y - units[id].y;
+fn monster_move(id: usize, player_x: i32, player_y: i32, map: &structures::Map, objects: &mut [structures::Object]) {
+    let dx = player_x - objects[id].x;
+    let dy = player_y - objects[id].y;
     let distance = ((dx*dx + dy*dy) as f32).sqrt();
 
     let dx = (dx as f32 / distance).round() as i32;
     let dy = (dy as f32 / distance).round() as i32;
 
-    move_by(id, dx, dy, map, units);
+    move_by(id, dx, dy, map, objects);
 }
 
-fn ai_turn(id: usize, tcod: &structures::Tcod, game: &mut structures::Game, units: &mut [structures::Unit]) {
-    let (monster_x, monster_y) = units[id].loc();
+fn ai_turn(id: usize, tcod: &structures::Tcod, game: &mut structures::Game, objects: &mut [structures::Object]) {
+    let (monster_x, monster_y) = objects[id].loc();
     if tcod.fov.is_in_fov(monster_x, monster_y) {
-        if units[id].get_distance_to(&units[config::PLAYER]) >= 2.0 {
-            let (player_x, player_y) = units[config::PLAYER].loc();
-            monster_move(id, player_x, player_y, &game.map, units);
+        if objects[id].get_distance_to(&objects[config::PLAYER]) >= 2.0 {
+            let (player_x, player_y) = objects[config::PLAYER].loc();
+            monster_move(id, player_x, player_y, &game.map, objects);
         } 
-        else if units[config::PLAYER].attackable.map_or(false, |a| a.hp > 0) {
-            let (monster, player) = mut_two(id, config::PLAYER, units);
+        else if objects[config::PLAYER].attackable.map_or(false, |a| a.hp > 0) {
+            let (monster, player) = mut_two(id, config::PLAYER, objects);
             monster.attack(player, game);
         }
     }
@@ -349,16 +386,17 @@ fn main() {
         panel: Offscreen::new(config::SCREEN_WIDTH, config::PANEL_HEIGHT),
     };
 
-    let mut player = structures::Unit::new(5, 5, '@', BLUE, "Player", true);
+    let mut player = structures::Object::new(5, 5, '@', BLUE, "Player", true);
 
     player.alive = true;
     player.attackable = Some(structures::Attackable{max_hp: 100, hp: 100, armor: 10, damage: 10, on_death: structures::DeathCallback::Player});
 
-    let mut units = vec![player]; // don't forget to change the number of units in generate_map() and handle_keys() definitions
+    let mut objects = vec![player]; // don't forget to change the number of objects in generate_map() and handle_keys() definitions
 
     let mut game = structures::Game {
-        map: generate_map(&mut units),
+        map: generate_map(&mut objects),
         messages: structures::Messages::new(),
+        inventory: vec![],
     };
     for y in 0..config::MAP_HEIGHT {
         for x in 0..config::MAP_WIDTH {
@@ -372,7 +410,7 @@ fn main() {
     }
 
     game.messages.add(
-    "Welcome stranger! Prepare to perish in the Tombs of the Ancient Kings.",
+    "Welcome to Dungeon. Prepare for danger!",
     RED,
 );
 
@@ -382,25 +420,19 @@ fn main() {
         
         tcod.screen.clear();
 
-        let fov_recompute = previous_player_position != (units[config::PLAYER].x, units[config::PLAYER].y);
-        render(&mut tcod, &mut game, &units, fov_recompute);
+        let fov_recompute = previous_player_position != (objects[config::PLAYER].x, objects[config::PLAYER].y);
+        render(&mut tcod, &mut game, &objects, fov_recompute);
         tcod.root.flush();
 
-        previous_player_position = units[config::PLAYER].loc();
-        let player_action = handle_keys(&mut tcod, &mut game, &mut units);
+        previous_player_position = objects[config::PLAYER].loc();
+        let player_action = handle_keys(&mut tcod, &mut game, &mut objects);
         if player_action == structures::PlayerAction::Exit {
             break;
         }
-        if units[config::PLAYER].alive && player_action != structures::PlayerAction::DidnotTakeTurn {
-            for id in 0..units.len() {
-                if units[id].ai.is_some() {
-                    ai_turn(id, &tcod, &mut game, &mut units);
-                }
-            }
-            for unit in &units {
-                // only if unitt is not player
-                if (unit as *const _) != (&units[config::PLAYER] as *const _) {
-                    println!("it is the {}'s turn!", unit.name);
+        if objects[config::PLAYER].alive && player_action != structures::PlayerAction::DidnotTakeTurn {
+            for id in 0..objects.len() {
+                if objects[id].ai.is_some() {
+                    ai_turn(id, &tcod, &mut game, &mut objects);
                 }
             }
         }
