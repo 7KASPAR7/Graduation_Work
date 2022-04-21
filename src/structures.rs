@@ -89,6 +89,8 @@ impl Object {
         Object{x, y, symbol, color, name: name.into(), blocks, alive: false, attackable: None, ai: None, item: None}
     }
 
+
+
     pub fn draw(&self, screen: &mut dyn Console) {
         screen.set_default_foreground(self.color);
         screen.put_char(self.x, self.y, self.symbol, BackgroundFlag::None);
@@ -143,6 +145,15 @@ impl Object {
             }
         }
     }
+
+    pub fn use_double_damage(&mut self) {
+        println!("Use DD");
+        if let Some(ref mut attackable) = self.attackable {
+            attackable.armor /= 2;
+            attackable.damage *= 2;
+        }
+    }
+
 }
 
 
@@ -233,6 +244,8 @@ impl Messages {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Item {
     Heal,
+    Fire,
+    DoubleDamage,
 }
 
 pub enum UseResult {

@@ -8,6 +8,7 @@ use tcod::map::{Map as FovMap};
 
 mod config;
 mod structures;
+mod skills;
 
 fn spawn_objects(room: structures::Rect, map: &structures::Map, objects: &mut Vec<structures::Object>) {
     let monster_num = rand::thread_rng().gen_range(0..config::MAX_ROOM_MONSTERS + 1);
@@ -17,7 +18,7 @@ fn spawn_objects(room: structures::Rect, map: &structures::Map, objects: &mut Ve
         let y = rand::thread_rng().gen_range(room.y1..room.y2+1);
         if !is_blocked(x, y, map, objects) {
             let mut monster;
-            if rand::random::<f32>() < 0.75 {
+            if rand::random::<f32>() < config::ORC_SPAWN_CHANCE {
                 monster = structures::Object::new(x, y, 'O', DESATURATED_PURPLE, "Orc", true);
                 monster.attackable = Some(structures::Attackable{max_hp: 50, hp: 50, armor: 5, damage: 12, on_death: structures::DeathCallback::Monster})
             } 
@@ -34,18 +35,28 @@ fn spawn_objects(room: structures::Rect, map: &structures::Map, objects: &mut Ve
     let num_items = rand::thread_rng().gen_range(0..config::MAX_ROOM_ITEMS + 1);
 
     for _ in 0..num_items {
-        // choose random spot for this item
         let x = rand::thread_rng().gen_range(room.x1 + 1..room.x2);
         let y = rand::thread_rng().gen_range(room.y1 + 1..room.y2);
 
-    // only place it if the tile is not blocked
-    if !is_blocked(x, y, map, objects) {
-        // create a healing potion
-        let mut item = structures::Object::new(x, y, '!',  VIOLET, "healing potion", false);
-        item.item = Some(structures::Item::Heal);
-        objects.push(item);
+        if !is_blocked(x, y, map, objects) {
+            let chance = rand::random::<f32>();
+            let item = if chance < config::HEAL_SPAWN_CHANCE {
+                let mut object = structures::Object::new(x, y, '!',  VIOLET, "healing potion", false);
+                object.item = Some(structures::Item::Heal);
+                object
+            } else if chance < config::HEAL_SPAWN_CHANCE + config::FIRE_SCROLL_SPAWN_CHANCE {
+                let mut object = structures::Object::new(x, y, '#', LIGHT_ORANGE, "scroll of fire mark", false);
+                object.item = Some(structures::Item::Fire);
+                object
+            }
+            else {
+                let mut object = structures::Object::new(x, y, '$', LIGHT_BLUE, "double damage", false);
+                object.item = Some(structures::Item::DoubleDamage);
+                object
+            };
+            objects.push(item);
+        }
     }
-}
 
 }
 
@@ -109,15 +120,7 @@ fn menu<T: AsRef<str>>(header: &str, options: &[T], width: i32, root: &mut Root)
 
     // print the header, with auto-wrap
     window.set_default_foreground(WHITE);
-    window.print_rect_ex(
-        0,
-        0,
-        width,
-        height,
-        BackgroundFlag::None,
-        TextAlignment::Left,
-        header,
-    );
+    window.print_rect_ex(0, 0, width, height, BackgroundFlag::None, TextAlignment::Left, header);
 
     // print all the options
     for (index, option_text) in options.iter().enumerate() {
@@ -171,26 +174,13 @@ fn inventory_menu(inventory: &[structures::Object], header: &str, root: &mut Roo
 }
 
 
-fn cast_heal(_inventory_id: usize, _tcod: &mut structures::Tcod, game: &mut structures::Game, objects: &mut [structures::Object]) -> structures::UseResult {
-    if let Some(attackable) = objects[config::PLAYER].attackable {
-        if attackable.hp == attackable.max_hp {
-            game.messages.add("You don't need a heal potion.", RED);
-            return structures::UseResult::Cancelled;
-        }
-
-        game.messages.add(format!("You was healed by {}!", config::HEAL_AMOUNT.to_string()), LIGHT_YELLOW);
-        objects[config::PLAYER].heal(config::HEAL_AMOUNT);
-        return structures::UseResult::UsedUp;
-    }
-    structures::UseResult::Cancelled
-}
-
-
 fn use_item(inventory_id: usize, tcod: &mut structures::Tcod, game: &mut  structures::Game, objects: &mut [ structures::Object]) {
     use structures::Item::*;
     if let Some(item) = game.inventory[inventory_id].item {
         let on_use = match item {
-            Heal => cast_heal,
+            Heal => skills::cast_heal,
+            Fire => skills::cast_fire,
+            DoubleDamage => skills::cast_dd,
         };
         match on_use(inventory_id, tcod, game, objects) {
             structures::UseResult::UsedUp => {
