@@ -89,13 +89,6 @@ impl Object {
         Object{x, y, symbol, color, name: name.into(), blocks, alive: false, attackable: None, ai: None, item: None}
     }
 
-    // pub fn move_by(&mut self, x_offset: i32, y_offset: i32, game: &Game) {
-    //     if !game.map[(self.x + x_offset) as usize][(self.y + y_offset) as usize].collision_enabled {
-    //         self.x += x_offset;
-    //         self.y += y_offset;
-    //     } 
-    // }
-
     pub fn draw(&self, screen: &mut dyn Console) {
         screen.set_default_foreground(self.color);
         screen.put_char(self.x, self.y, self.symbol, BackgroundFlag::None);
@@ -140,8 +133,15 @@ impl Object {
         else {
             game.messages.add(format!("{}'s armor is stronger than {}'s damage", target.name, self.name), WHITE);
         }
+    }
 
-
+    pub fn heal(&mut self, amount: i32) {
+        if let Some(ref mut attackable) = self.attackable {
+            attackable.hp += amount;
+            if attackable.hp > attackable.max_hp {
+                attackable.hp = attackable.max_hp;
+            }
+        }
     }
 }
 
@@ -195,17 +195,14 @@ impl DeathCallback {
 
 
 fn player_death(player: &mut Object, game: &mut Game) {
-    // the game ended!
     game.messages.add("You died!", RED);
+    game.messages.add("Game Over!", RED);
 
-    // for added effect, transform the player into a corpse!
     player.symbol = '%';
     player.color = DARK_RED;
 }
 
 fn monster_death(monster: &mut Object, game: &mut Game) {
-    // transform it into a nasty corpse! it doesn't block, can't be
-    // attacked and doesn't move
     game.messages.add(format!("{} is dead!", monster.name), ORANGE);
     monster.symbol = '%';
     monster.color = DARK_RED;
@@ -236,4 +233,9 @@ impl Messages {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Item {
     Heal,
+}
+
+pub enum UseResult {
+    UsedUp,
+    Cancelled,
 }

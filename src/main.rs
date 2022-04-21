@@ -94,6 +94,118 @@ fn create_ver_tunnel(x: i32, y1: i32, y2: i32, map: &mut structures::Map) {
     }
 }
 
+fn menu<T: AsRef<str>>(header: &str, options: &[T], width: i32, root: &mut Root) -> Option<usize> {
+    assert!(
+        options.len() <= 26,
+        "Cannot have a menu with more than 26 options."
+    );
+
+    // calculate total height for the header (after auto-wrap) and one line per option
+    let header_height = root.get_height_rect(0, 0, width, config::SCREEN_HEIGHT, header);
+    let height = options.len() as i32 + header_height;
+
+    // create an off-screen console that represents the menu's window
+    let mut window = Offscreen::new(width, height);
+
+    // print the header, with auto-wrap
+    window.set_default_foreground(WHITE);
+    window.print_rect_ex(
+        0,
+        0,
+        width,
+        height,
+        BackgroundFlag::None,
+        TextAlignment::Left,
+        header,
+    );
+
+    // print all the options
+    for (index, option_text) in options.iter().enumerate() {
+        let menu_letter = (b'a' + index as u8) as char;
+        let text = format!("({}) {}", menu_letter, option_text.as_ref());
+        window.print_ex(
+            0,
+            header_height + index as i32,
+            BackgroundFlag::None,
+            TextAlignment::Left,
+            text,
+        );
+    }
+
+    // blit the contents of "window" to the root console
+    let x = config::SCREEN_WIDTH / 2 - width / 2;
+    let y = config::SCREEN_HEIGHT / 2 - height / 2;
+    blit(&window, (0, 0), (width, height), root, (x, y), 1.0, 0.7);
+
+    // present the root console to the player and wait for a key-press
+    root.flush();
+    let key = root.wait_for_keypress(true);
+
+    // convert the ASCII code to an index; if it corresponds to an option, return it
+    if key.printable.is_alphabetic() {
+        let index = key.printable.to_ascii_lowercase() as usize - 'a' as usize;
+        if index < options.len() {
+            Some(index)
+        } else {
+            None
+        }
+    } else {
+        None
+    }
+}
+
+fn inventory_menu(inventory: &[structures::Object], header: &str, root: &mut Root) -> Option<usize> {
+    let options = if inventory.len() == 0 {
+        vec!["Inventory is empty.".into()]
+    } else {
+        inventory.iter().map(|item| item.name.clone()).collect()
+    };
+
+    let inventory_index = menu(header, &options, config::INVENTORY_WIDTH, root);
+
+    if inventory.len() > 0 {
+        inventory_index
+    } else {
+        None
+    }
+}
+
+
+fn cast_heal(_inventory_id: usize, _tcod: &mut structures::Tcod, game: &mut structures::Game, objects: &mut [structures::Object]) -> structures::UseResult {
+    if let Some(attackable) = objects[config::PLAYER].attackable {
+        if attackable.hp == attackable.max_hp {
+            game.messages.add("You don't need a heal potion.", RED);
+            return structures::UseResult::Cancelled;
+        }
+
+        game.messages.add(format!("You was healed by {}!", config::HEAL_AMOUNT.to_string()), LIGHT_YELLOW);
+        objects[config::PLAYER].heal(config::HEAL_AMOUNT);
+        return structures::UseResult::UsedUp;
+    }
+    structures::UseResult::Cancelled
+}
+
+
+fn use_item(inventory_id: usize, tcod: &mut structures::Tcod, game: &mut  structures::Game, objects: &mut [ structures::Object]) {
+    use structures::Item::*;
+    if let Some(item) = game.inventory[inventory_id].item {
+        let on_use = match item {
+            Heal => cast_heal,
+        };
+        match on_use(inventory_id, tcod, game, objects) {
+            structures::UseResult::UsedUp => {
+                game.inventory.remove(inventory_id);
+            }
+            structures::UseResult::Cancelled => {
+                game.messages.add("Cancelled", WHITE);
+            }
+        }
+    } else {
+        game.messages.add(format!("The {} can't be used.", game.inventory[inventory_id].name), WHITE);
+    }
+}
+
+
 fn generate_map(objects: &mut Vec<structures::Object>) -> structures::Map {
 
     let mut map = vec![vec![structures::Tile::wall(); config::MAP_HEIGHT as usize]; config::MAP_WIDTH as usize];
@@ -118,7 +230,6 @@ fn generate_map(objects: &mut Vec<structures::Object>) -> structures::Map {
 
             spawn_objects(new_room, &map, objects);
 
-            // center coordinates of the new room
             let (new_x, new_y) = new_room.center();
             // println!("new {}, {}", new_x, new_y);
 
@@ -203,34 +314,33 @@ fn render(tcod: &mut structures::Tcod, game: &mut structures::Game, objects: &[s
         );
     }
     
-    // prepare to render the GUI panel
-tcod.panel.set_default_background(BLACK);
-tcod.panel.clear();
+    tcod.panel.set_default_background(BLACK);
+    tcod.panel.clear();
 
-let mut y = config::MESSAGES_HEIGHT as i32;
-for &(ref msg, color) in game.messages.iter().rev() {
-    let msg_height = tcod.panel.get_height_rect(config::MESSAGES_X, y, config::MESSAGES_WIDTH, 0, msg);
-    y -= msg_height;
-    if y < 0 {
-        break;
+    let mut y = config::MESSAGES_HEIGHT as i32;
+    for &(ref msg, color) in game.messages.iter().rev() {
+        let msg_height = tcod.panel.get_height_rect(config::MESSAGES_X, y, config::MESSAGES_WIDTH, 0, msg);
+        y -= msg_height;
+        if y < 0 {
+            break;
+        }
+        tcod.panel.set_default_foreground(color);
+        tcod.panel.print_rect(config::MESSAGES_X, y, config::MESSAGES_WIDTH, 0, msg);
     }
-    tcod.panel.set_default_foreground(color);
-    tcod.panel.print_rect(config::MESSAGES_X, y, config::MESSAGES_WIDTH, 0, msg);
-}
 
-let hp = objects[config::PLAYER].attackable.map_or(0, |f| f.hp);
-let max_hp = objects[config::PLAYER].attackable.map_or(0, |f| f.max_hp);
-render_bar(&mut tcod.panel, 1, 1, config::BAR_WIDTH, "HP", hp, max_hp, LIGHT_RED, DARKER_RED);
+    let hp = objects[config::PLAYER].attackable.map_or(0, |f| f.hp);
+    let max_hp = objects[config::PLAYER].attackable.map_or(0, |f| f.max_hp);
+    render_bar(&mut tcod.panel, 1, 1, config::BAR_WIDTH, "HP", hp, max_hp, LIGHT_RED, DARKER_RED);
 
-blit(
-    &tcod.panel,
-    (0, 0),
-    (config::SCREEN_WIDTH, config::PANEL_HEIGHT),
-    &mut tcod.root,
-    (0, config::PANEL_Y),
-    1.0,
-    1.0,
-);
+    blit(
+        &tcod.panel,
+        (0, 0),
+        (config::SCREEN_WIDTH, config::PANEL_HEIGHT),
+        &mut tcod.root,
+        (0, config::PANEL_Y),
+        1.0,
+        1.0,
+    );
 
 }
 
@@ -251,9 +361,7 @@ fn handle_keys(tcod: &mut structures::Tcod, game: &mut structures::Game, objects
 
     match (key, key.text(), player_alive) {
 
-        
-
-        (Key { code: Escape, .. }, _, _) => Exit, // exit game
+        (Key { code: Escape, .. }, _, _) => Exit,
         
         (Key { code: Up, .. }, _, true) => {
             player_move_or_attack(0, -1, game, objects);
@@ -282,6 +390,18 @@ fn handle_keys(tcod: &mut structures::Tcod, game: &mut structures::Game, objects
             }
             DidnotTakeTurn
         },
+
+        (Key { code: Number2, .. }, _, true) => {
+            let inventory_index = inventory_menu(
+                &game.inventory,
+                "Press the key to use an item or any other to cancel.\n",
+                &mut tcod.root,
+            );
+            if let Some(inventory_index) = inventory_index {
+                use_item(inventory_index, tcod, game, objects);
+            }
+            DidnotTakeTurn
+        }
 
         _ => DidnotTakeTurn,
     }
@@ -357,13 +477,7 @@ fn render_bar(panel: &mut Offscreen, x: i32, y: i32, total_width: i32, name: &st
     }
 
     panel.set_default_foreground(WHITE);
-    panel.print_ex(
-        x + total_width / 2,
-        y,
-        BackgroundFlag::None,
-        TextAlignment::Center,
-        &format!("{}: {}/{}", name, value, maximum),
-    );
+    panel.print_ex(x + total_width / 2, y, BackgroundFlag::None, TextAlignment::Center, &format!("{}: {}/{}", name, value, maximum));
 }
 
 fn main() {
@@ -391,7 +505,7 @@ fn main() {
     player.alive = true;
     player.attackable = Some(structures::Attackable{max_hp: 100, hp: 100, armor: 10, damage: 10, on_death: structures::DeathCallback::Player});
 
-    let mut objects = vec![player]; // don't forget to change the number of objects in generate_map() and handle_keys() definitions
+    let mut objects = vec![player];
 
     let mut game = structures::Game {
         map: generate_map(&mut objects),
@@ -409,10 +523,7 @@ fn main() {
         }
     }
 
-    game.messages.add(
-    "Welcome to Dungeon. Prepare for danger!",
-    RED,
-);
+    game.messages.add("Welcome to Dungeon. Prepare for danger!", RED);
 
     let mut previous_player_position = (-1, -1);
 

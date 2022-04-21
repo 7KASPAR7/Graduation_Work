@@ -15,6 +15,10 @@ pub const BAR_WIDTH: i32 = 20;
 pub const PANEL_HEIGHT: i32 = 7;
 pub const PANEL_Y: i32 = SCREEN_HEIGHT - PANEL_HEIGHT;
 
+pub const INVENTORY_WIDTH: i32 = 50;
+
+pub const HEAL_AMOUNT: i32 = 10;
+
 pub const MESSAGES_X: i32 = BAR_WIDTH + 2;
 pub const MESSAGES_WIDTH: i32 = SCREEN_WIDTH - BAR_WIDTH - 2;
 pub const MESSAGES_HEIGHT: usize = PANEL_HEIGHT as usize - 1;
