@@ -82,11 +82,12 @@ pub struct Object {
     pub attackable: Option<Attackable>,
     pub ai: Option<Ai>,
     pub item: Option<Item>,
+    pub always_visible: bool,
 }
 
 impl Object {
     pub fn new(x: i32, y: i32, symbol: char, color: Color, name: &str, blocks: bool) -> Self {
-        Object{x, y, symbol, color, name: name.into(), blocks, alive: false, attackable: None, ai: None, item: None}
+        Object{x, y, symbol, color, name: name.into(), blocks, alive: false, attackable: None, ai: None, item: None, always_visible: false}
     }
 
 
@@ -169,6 +170,7 @@ pub struct Game{
     pub map: Map,
     pub messages: Messages,
     pub inventory: Vec<Object>,
+    pub level: u32,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]

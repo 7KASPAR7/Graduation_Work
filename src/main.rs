@@ -43,19 +43,23 @@ fn spawn_objects(room: structures::Rect, map: &structures::Map, objects: &mut Ve
             let item = if chance < config::HEAL_SPAWN_CHANCE {
                 let mut object = structures::Object::new(x, y, '!',  VIOLET, "healing potion", false);
                 object.item = Some(structures::Item::Heal);
+                object.always_visible = true;
                 object
             } else if chance < config::HEAL_SPAWN_CHANCE + config::FIRE_SCROLL_SPAWN_CHANCE {
                 let mut object = structures::Object::new(x, y, '#', LIGHT_ORANGE, "scroll of fire mark", false);
                 object.item = Some(structures::Item::Fire);
+                object.always_visible = true;
                 object
             }
             else if chance < config::HEAL_SPAWN_CHANCE + config::FIRE_SCROLL_SPAWN_CHANCE + config::DOUBLE_DAMAGE_SPAWN_CHANCE {
                 let mut object = structures::Object::new(x, y, '$', LIGHT_BLUE, "double damage", false);
                 object.item = Some(structures::Item::DoubleDamage);
+                object.always_visible = true;
                 object
             } else {
                 let mut object = structures::Object::new(x, y, '?', BLACK, "Flesh", false);
                 object.item = Some(structures::Item::Blind);
+                object.always_visible = true;
                 object
             }
             ;
@@ -204,6 +208,9 @@ fn use_item(inventory_id: usize, tcod: &mut structures::Tcod, game: &mut  struct
 fn generate_map(objects: &mut Vec<structures::Object>) -> structures::Map {
 
     let mut map = vec![vec![structures::Tile::wall(); config::MAP_HEIGHT as usize]; config::MAP_WIDTH as usize];
+
+    assert_eq!(&objects[config::PLAYER] as *const _, &objects[0] as *const _);
+    objects.truncate(1);
     
     let mut rooms = vec![];
 
@@ -247,6 +254,11 @@ fn generate_map(objects: &mut Vec<structures::Object>) -> structures::Map {
         }
     }
 
+    let (last_room_x, last_room_y) = rooms[rooms.len() - 1].center();
+    let mut door = structures::Object::new(last_room_x, last_room_y, '<', WHITE, "door", false);
+    door.always_visible = true;
+    objects.push(door);
+
     map
 }
 
@@ -279,12 +291,10 @@ fn render(tcod: &mut structures::Tcod, game: &mut structures::Game, objects: &[s
             }
         }
     }
-    let mut to_draw: Vec<_> = objects.iter().collect();
+    let mut to_draw: Vec<_> = objects.iter().filter(|o| {tcod.fov.is_in_fov(o.x, o.y) || (o.always_visible && game.map[o.x as usize][o.y as usize].is_explored)}).collect();
     to_draw.sort_by(|o1, o2| { o1.blocks.cmp(&o2.blocks) });
     for object in &to_draw {
-        if tcod.fov.is_in_fov(object.x, object.y) {
-            object.draw(&mut tcod.screen);
-        }
+        object.draw(&mut tcod.screen);
     }
 
     blit(
@@ -327,6 +337,8 @@ fn render(tcod: &mut structures::Tcod, game: &mut structures::Game, objects: &[s
     let max_hp = objects[config::PLAYER].attackable.map_or(0, |f| f.max_hp);
     render_bar(&mut tcod.panel, 1, 1, config::BAR_WIDTH, "HP", hp, max_hp, LIGHT_RED, DARKER_RED);
 
+    tcod.panel.print_ex(1, 3, BackgroundFlag::None, TextAlignment::Left, format!("Dungeon level: {}", game.level));
+
     blit(
         &tcod.panel,
         (0, 0),
@@ -346,6 +358,25 @@ fn move_by(id: usize, dx: i32, dy: i32, map: &structures::Map, objects: &mut [st
     }
 }
 
+fn initialise_fov(tcod: &mut structures::Tcod, map: &structures::Map) {
+    for y in 0..config::MAP_HEIGHT {
+        for x in 0..config::MAP_WIDTH {
+            tcod.fov.set(x, y, !map[x as usize][y as usize].is_visible, !map[x as usize][y as usize].collision_enabled);
+        }
+    }
+}
+
+fn next_level(tcod: &mut structures::Tcod, game: &mut structures::Game, objects: &mut Vec<structures::Object>) {
+    game.messages.add("You are healing", VIOLET);
+    let heal_hp = objects[config::PLAYER].attackable.map_or(0, |f| f.max_hp / 2);
+    objects[config::PLAYER].heal(heal_hp);
+
+    game.messages.add(format!("Prepare to danger on the {} level", game.level), RED);
+    game.level += 1;
+    game.map = generate_map(objects);
+    initialise_fov(tcod, &game.map);
+}
+
 fn handle_keys(tcod: &mut structures::Tcod, game: &mut structures::Game, objects: &mut Vec<structures::Object>) -> structures::PlayerAction {
     use tcod::input::Key;
     use tcod::input::KeyCode::*;
@@ -357,6 +388,15 @@ fn handle_keys(tcod: &mut structures::Tcod, game: &mut structures::Game, objects
     match (key, key.text(), player_alive) {
 
         (Key { code: Escape, .. }, _, _) => Exit,
+
+        (Key { code: Number5, .. }, _, true) => {
+            // go down stairs, if the player is on them
+            let player_on_stairs = objects.iter().any(|object| object.loc() == objects[config::PLAYER].loc() && object.name == "door");
+            if player_on_stairs {
+                next_level(tcod, game, objects);
+            }
+            DidnotTakeTurn
+        }
         
         (Key { code: Up, .. }, _, true) => {
             player_move_or_attack(0, -1, game, objects);
@@ -527,6 +567,7 @@ fn main() {
         map: generate_map(&mut objects),
         messages: structures::Messages::new(),
         inventory: vec![],
+        level: 1,
     };
     for y in 0..config::MAP_HEIGHT {
         for x in 0..config::MAP_WIDTH {
