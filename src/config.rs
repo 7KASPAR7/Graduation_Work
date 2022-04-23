@@ -19,13 +19,16 @@ pub const INVENTORY_WIDTH: i32 = 50;
 
 // chances
 pub const ORC_SPAWN_CHANCE: f32 = 0.75;
-pub const HEAL_SPAWN_CHANCE: f32 = 0.5;
+pub const HEAL_SPAWN_CHANCE: f32 = 0.25;
 pub const FIRE_SCROLL_SPAWN_CHANCE: f32 = 0.25;
+pub const DOUBLE_DAMAGE_SPAWN_CHANCE: f32 = 0.25;
 
 // skills 
 pub const HEAL_AMOUNT: i32 = 10;
 pub const FIRE_DAMAGE: i32 = 10;
 pub const FIRE_RANGE: i32 = 10;
+pub const BLIND_RANGE: i32 = 3;
+pub const BLIND_NUM_TURNS: i32 = 10;
 
 // messages
 pub const MESSAGES_X: i32 = BAR_WIDTH + 2;

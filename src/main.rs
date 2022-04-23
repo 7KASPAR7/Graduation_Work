@@ -49,18 +49,22 @@ fn spawn_objects(room: structures::Rect, map: &structures::Map, objects: &mut Ve
                 object.item = Some(structures::Item::Fire);
                 object
             }
-            else {
+            else if chance < config::HEAL_SPAWN_CHANCE + config::FIRE_SCROLL_SPAWN_CHANCE + config::DOUBLE_DAMAGE_SPAWN_CHANCE {
                 let mut object = structures::Object::new(x, y, '$', LIGHT_BLUE, "double damage", false);
                 object.item = Some(structures::Item::DoubleDamage);
                 object
-            };
+            } else {
+                let mut object = structures::Object::new(x, y, '?', BLACK, "Flesh", false);
+                object.item = Some(structures::Item::Blind);
+                object
+            }
+            ;
             objects.push(item);
         }
     }
 
 }
 
-/// add to the player's inventory and remove from the map
 fn pick_item_up(object_id: usize, game: &mut structures::Game, objects: &mut Vec<structures::Object>) {
     if game.inventory.len() >= 26 {
         game.messages.add(
@@ -181,6 +185,7 @@ fn use_item(inventory_id: usize, tcod: &mut structures::Tcod, game: &mut  struct
             Heal => skills::cast_heal,
             Fire => skills::cast_fire,
             DoubleDamage => skills::cast_dd,
+            Blind => skills::cast_blind,
         };
         match on_use(inventory_id, tcod, game, objects) {
             structures::UseResult::UsedUp => {
@@ -431,16 +436,37 @@ fn monster_move(id: usize, player_x: i32, player_y: i32, map: &structures::Map, 
 }
 
 fn ai_turn(id: usize, tcod: &structures::Tcod, game: &mut structures::Game, objects: &mut [structures::Object]) {
+    use structures::Ai::*;
+    if let Some(ai) = objects[id].ai.take() {
+        let new_ai = match ai {
+            Basic => ai_basic(id, tcod, game, objects),
+            Blind {prev_ai, num_turns} => ai_blind(id, tcod, game, objects, prev_ai, num_turns),
+        };
+        objects[id].ai = Some(new_ai);
+    }
+}
+
+fn ai_basic(id: usize, tcod: &structures::Tcod, game: &mut structures::Game, objects: &mut [structures::Object]) -> structures::Ai {
     let (monster_x, monster_y) = objects[id].loc();
     if tcod.fov.is_in_fov(monster_x, monster_y) {
         if objects[id].get_distance_to(&objects[config::PLAYER]) >= 2.0 {
             let (player_x, player_y) = objects[config::PLAYER].loc();
             monster_move(id, player_x, player_y, &game.map, objects);
-        } 
-        else if objects[config::PLAYER].attackable.map_or(false, |a| a.hp > 0) {
+        } else if objects[config::PLAYER].attackable.map_or(false, |f| f.hp > 0) {
             let (monster, player) = mut_two(id, config::PLAYER, objects);
             monster.attack(player, game);
         }
+    }
+    structures::Ai::Basic
+}
+
+fn ai_blind(id: usize, _tcod: &structures::Tcod, game: &mut structures::Game, objects: &mut [structures::Object], previous_ai: Box<structures::Ai>, num_turns: i32) -> structures::Ai {
+    if num_turns >= 0 {
+        move_by( id, rand::thread_rng().gen_range(-1..2), rand::thread_rng().gen_range(-1..2), &game.map, objects);
+        structures::Ai::Blind{prev_ai: previous_ai, num_turns: num_turns - 1}
+    } else {
+        game.messages.add(format!("The {} is no longer confused!", objects[id].name), RED);
+        *previous_ai
     }
 }
 

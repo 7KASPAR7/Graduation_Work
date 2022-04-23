@@ -115,7 +115,12 @@ impl Object {
     pub fn get_damage(&mut self, damage: i32, game: &mut Game) {
         if let Some(attackable) = self.attackable.as_mut() {
             if damage > 0 {
-                attackable.hp -= damage;
+                if attackable.hp - damage > 0 {
+                    attackable.hp -= damage;
+                }
+                else {
+                    attackable.hp = 0;
+                }
             }
         }
         if let Some(attackable) = self.attackable {
@@ -185,6 +190,10 @@ pub struct Attackable {
 #[derive(Clone, Debug, PartialEq)] 
 pub enum Ai {
     Basic,
+    Blind {
+        prev_ai: Box<Ai>, 
+        num_turns: i32
+    },
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -246,6 +255,7 @@ pub enum Item {
     Heal,
     Fire,
     DoubleDamage,
+    Blind,
 }
 
 pub enum UseResult {
