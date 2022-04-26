@@ -21,11 +21,11 @@ fn spawn_objects(room: structures::Rect, map: &structures::Map, objects: &mut Ve
             let mut monster;
             if rand::random::<f32>() < config::ORC_SPAWN_CHANCE {
                 monster = structures::Object::new(x, y, 'O', DESATURATED_PURPLE, "Orc", true);
-                monster.attackable = Some(structures::Attackable{max_hp: 30, hp: 30, armor: 3, damage: 10, xp: 75, on_death: structures::DeathCallback::Monster})
+                monster.attackable = Some(structures::Attackable{max_hp: 30, hp: 30, armor: 4, damage: 10, xp: 75, on_death: structures::DeathCallback::Monster})
             } 
             else {
                 monster = structures::Object::new(x, y, 'T', DESATURATED_ORANGE, "Troll", true);
-                monster.attackable = Some(structures::Attackable{max_hp: 50, hp: 50, armor: 6, damage: 5, xp: 100, on_death: structures::DeathCallback::Monster})
+                monster.attackable = Some(structures::Attackable{max_hp: 50, hp: 50, armor: 6, damage: 7, xp: 100, on_death: structures::DeathCallback::Monster})
             } 
             monster.alive = true;
             monster.ai = Some(structures::Ai::Basic);
@@ -352,7 +352,7 @@ fn next_level(tcod: &mut structures::Tcod, game: &mut structures::Game, objects:
     objects[config::PLAYER].heal(heal_hp);
 
     game.level += 1;
-    game.messages.add(format!("Prepare to danger on the {} level", game.level), RED);
+    game.messages.add(format!("Prepare to danger on the {} level. Monsters became stronger!", game.level), RED);
     game.map = generate_map(objects);
     monsters_level_up(game, objects);
     initialise_fov(tcod, &game.map);
@@ -366,7 +366,6 @@ fn monsters_level_up(game: &mut structures::Game, objects: &mut Vec<structures::
             attackable.max_hp += config::MAX_HP_PER_LEVEL * game.level as i32;
             attackable.hp = attackable.max_hp;
             attackable.xp += config::XP_PER_LEVEL * game.level as i32;
-            println!("level up {} XP", attackable.xp);
         }
     }
 }
@@ -564,7 +563,6 @@ fn level_up(tcod: &mut structures::Tcod, game: &mut structures::Game, objects: &
     match choice.unwrap() {
         0 => {
             attackable.max_hp += config::PLAYER_MAX_HP_PER_LEVEL;
-            attackable.hp = attackable.max_hp;
         }
         1 => {
             attackable.damage += config::PLAYER_DAMAGE_PER_LEVEL;
@@ -574,6 +572,7 @@ fn level_up(tcod: &mut structures::Tcod, game: &mut structures::Game, objects: &
         }
         _ => unreachable!(),
     }
+    attackable.hp = attackable.max_hp;
     }
 }
 
@@ -615,7 +614,7 @@ fn main() {
     let mut player = structures::Object::new(5, 5, '@', BLUE, "Player", true);
 
     player.alive = true;
-    player.attackable = Some(structures::Attackable{max_hp: 100, hp: 100, armor: 7, damage: 10, xp: 0, on_death: structures::DeathCallback::Player});
+    player.attackable = Some(structures::Attackable{max_hp: 100, hp: 100, armor: 6, damage: 10, xp: 0, on_death: structures::DeathCallback::Player});
 
     let mut objects = vec![player];
 
@@ -627,12 +626,7 @@ fn main() {
     };
     for y in 0..config::MAP_HEIGHT {
         for x in 0..config::MAP_WIDTH {
-            tcod.fov.set(
-                x,
-                y,
-                !game.map[x as usize][y as usize].is_visible,
-                !game.map[x as usize][y as usize].collision_enabled,
-            );
+            tcod.fov.set(x, y, !game.map[x as usize][y as usize].is_visible, !game.map[x as usize][y as usize].collision_enabled);
         }
     }
 
