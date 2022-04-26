@@ -35,7 +35,9 @@ pub fn cast_fire(_inventory_id: usize, tcod: &mut structures::Tcod, game: &mut s
     if let Some(monster_id) = monster_id {
         game.messages.add(
             format!("A fire mark burns the {}! The damage is {} hit points.", objects[monster_id].name, config::FIRE_DAMAGE),LIGHT_ORANGE);
-        objects[monster_id].get_damage(config::FIRE_DAMAGE, game);
+        if let Some(xp) = objects[monster_id].get_damage(config::FIRE_DAMAGE, game) {
+            objects[config::PLAYER].attackable.as_mut().unwrap().xp += xp;
+        }
         structures::UseResult::UsedUp
     } else {
         game.messages

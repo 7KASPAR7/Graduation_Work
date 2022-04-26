@@ -83,11 +83,12 @@ pub struct Object {
     pub ai: Option<Ai>,
     pub item: Option<Item>,
     pub always_visible: bool,
+    pub level: i32,
 }
 
 impl Object {
     pub fn new(x: i32, y: i32, symbol: char, color: Color, name: &str, blocks: bool) -> Self {
-        Object{x, y, symbol, color, name: name.into(), blocks, alive: false, attackable: None, ai: None, item: None, always_visible: false}
+        Object{x, y, symbol, color, name: name.into(), blocks, alive: false, attackable: None, ai: None, item: None, always_visible: false, level: 1}
     }
 
 
@@ -113,7 +114,7 @@ impl Object {
         ((dx*dx + dy*dy) as f32).sqrt()
     }
 
-    pub fn get_damage(&mut self, damage: i32, game: &mut Game) {
+    pub fn get_damage(&mut self, damage: i32, game: &mut Game) -> Option<i32> {
         if let Some(attackable) = self.attackable.as_mut() {
             if damage > 0 {
                 if attackable.hp - damage > 0 {
@@ -128,15 +129,19 @@ impl Object {
             if attackable.hp <= 0 {
                 self.alive = false;
                 attackable.on_death.callback(self, game);
+                return Some(attackable.xp);
             }
         }
+        None
     }
 
     pub fn attack(&mut self, target: &mut Object, game: &mut Game) {
         let damage = self.attackable.map_or(0, |a| a.damage) - target.attackable.map_or(0, |a| a.armor);
         if damage > 0 {
             game.messages.add(format!("{} dealt {} damage to {}", self.name, damage, target.name), WHITE);
-            target.get_damage(damage, game);
+            if let Some(xp) = target.get_damage(damage, game) {
+                self.attackable.as_mut().unwrap().xp += xp;
+            }
         }
         else {
             game.messages.add(format!("{}'s armor is stronger than {}'s damage", target.name, self.name), WHITE);
@@ -186,6 +191,7 @@ pub struct Attackable {
     pub hp: i32,
     pub armor: i32,
     pub damage: i32,
+    pub xp: i32,
     pub on_death: DeathCallback,
 }
 
@@ -225,7 +231,7 @@ fn player_death(player: &mut Object, game: &mut Game) {
 }
 
 fn monster_death(monster: &mut Object, game: &mut Game) {
-    game.messages.add(format!("{} is dead!", monster.name), ORANGE);
+    game.messages.add(format!("{} is dead! You gain {} experience points", monster.name, monster.attackable.unwrap().xp), ORANGE);
     monster.symbol = '%';
     monster.color = DARK_RED;
     monster.blocks = false;

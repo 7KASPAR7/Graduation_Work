@@ -2,7 +2,6 @@ use tcod::colors::*;
 
 use tcod::map::{FovAlgorithm};
 
-
 // actual size of the window
 pub const SCREEN_WIDTH: i32 = 80;
 pub const SCREEN_HEIGHT: i32 = 50;
@@ -16,6 +15,8 @@ pub const BAR_WIDTH: i32 = 20;
 pub const PANEL_HEIGHT: i32 = 7;
 pub const PANEL_Y: i32 = SCREEN_HEIGHT - PANEL_HEIGHT;
 pub const INVENTORY_WIDTH: i32 = 50;
+pub const LEVEL_SCREEN_WIDTH: i32 = 40;
+pub const CHARACTER_SCREEN_WIDTH: i32 = 30;
 
 // chances
 pub const ORC_SPAWN_CHANCE: f32 = 0.75;
@@ -29,6 +30,19 @@ pub const FIRE_DAMAGE: i32 = 10;
 pub const FIRE_RANGE: i32 = 10;
 pub const BLIND_RANGE: i32 = 3;
 pub const BLIND_NUM_TURNS: i32 = 10;
+
+// level up
+pub const LEVEL_UP_XP_BASE: i32 = 200;
+pub const LEVEL_UP_XP_PER_LEVEL: i32 = 150;
+
+pub const DAMAGE_PER_LEVEL: i32 = 2;
+pub const ARMOR_PER_LEVEL: i32 = 1;
+pub const MAX_HP_PER_LEVEL: i32 = 5;
+pub const XP_PER_LEVEL: i32 = 20;
+
+pub const PLAYER_DAMAGE_PER_LEVEL: i32 = 5;
+pub const PLAYER_ARMOR_PER_LEVEL: i32 = 3;
+pub const PLAYER_MAX_HP_PER_LEVEL: i32 = 25;
 
 // messages
 pub const MESSAGES_X: i32 = BAR_WIDTH + 2;

@@ -11,6 +11,7 @@ mod structures;
 mod skills;
 
 fn spawn_objects(room: structures::Rect, map: &structures::Map, objects: &mut Vec<structures::Object>) {
+    
     let monster_num = rand::thread_rng().gen_range(0..config::MAX_ROOM_MONSTERS + 1);
     
     for _ in 0..monster_num {
@@ -20,12 +21,12 @@ fn spawn_objects(room: structures::Rect, map: &structures::Map, objects: &mut Ve
             let mut monster;
             if rand::random::<f32>() < config::ORC_SPAWN_CHANCE {
                 monster = structures::Object::new(x, y, 'O', DESATURATED_PURPLE, "Orc", true);
-                monster.attackable = Some(structures::Attackable{max_hp: 50, hp: 50, armor: 5, damage: 12, on_death: structures::DeathCallback::Monster})
+                monster.attackable = Some(structures::Attackable{max_hp: 30, hp: 30, armor: 3, damage: 10, xp: 75, on_death: structures::DeathCallback::Monster})
             } 
             else {
                 monster = structures::Object::new(x, y, 'T', DESATURATED_ORANGE, "Troll", true);
-                monster.attackable = Some(structures::Attackable{max_hp: 30, hp: 30, armor: 2, damage: 15, on_death: structures::DeathCallback::Monster})
-            }
+                monster.attackable = Some(structures::Attackable{max_hp: 50, hp: 50, armor: 6, damage: 5, xp: 100, on_death: structures::DeathCallback::Monster})
+            } 
             monster.alive = true;
             monster.ai = Some(structures::Ai::Basic);
             objects.push(monster);
@@ -72,16 +73,10 @@ fn spawn_objects(room: structures::Rect, map: &structures::Map, objects: &mut Ve
 fn pick_item_up(object_id: usize, game: &mut structures::Game, objects: &mut Vec<structures::Object>) {
     if game.inventory.len() >= 26 {
         game.messages.add(
-            format!(
-                "Your inventory is full, cannot pick up {}.",
-                objects[object_id].name
-            ),
-            RED,
-        );
+            format!("Your inventory is full, cannot pick up {}.", objects[object_id].name), RED);
     } else {
         let item = objects.swap_remove(object_id);
-        game.messages
-            .add(format!("You picked up a {}!", item.name), GREEN);
+        game.messages.add(format!("You picked up a {}!", item.name), GREEN);
         game.inventory.push(item);
     }
 }
@@ -114,10 +109,7 @@ fn create_ver_tunnel(x: i32, y1: i32, y2: i32, map: &mut structures::Map) {
 }
 
 fn menu<T: AsRef<str>>(header: &str, options: &[T], width: i32, root: &mut Root) -> Option<usize> {
-    assert!(
-        options.len() <= 26,
-        "Cannot have a menu with more than 26 options."
-    );
+    assert!(options.len() <= 26, "Cannot have a menu with more than 26 options.");
 
     // calculate total height for the header (after auto-wrap) and one line per option
     let header_height = root.get_height_rect(0, 0, width, config::SCREEN_HEIGHT, header);
@@ -134,13 +126,7 @@ fn menu<T: AsRef<str>>(header: &str, options: &[T], width: i32, root: &mut Root)
     for (index, option_text) in options.iter().enumerate() {
         let menu_letter = (b'a' + index as u8) as char;
         let text = format!("({}) {}", menu_letter, option_text.as_ref());
-        window.print_ex(
-            0,
-            header_height + index as i32,
-            BackgroundFlag::None,
-            TextAlignment::Left,
-            text,
-        );
+        window.print_ex(0, header_height + index as i32, BackgroundFlag::None, TextAlignment::Left, text);
     }
 
     // blit the contents of "window" to the root console
@@ -310,13 +296,7 @@ fn render(tcod: &mut structures::Tcod, game: &mut structures::Game, objects: &[s
     
     tcod.root.set_default_foreground(WHITE);
     if let Some(attackable) = objects[config::PLAYER].attackable {
-        tcod.root.print_ex(
-            1,
-            config::SCREEN_HEIGHT - 2,
-            BackgroundFlag::None,
-            TextAlignment::Left,
-            format!("HP: {}/{} ", attackable.hp, attackable.max_hp),
-        );
+        tcod.root.print_ex(1, config::SCREEN_HEIGHT - 2, BackgroundFlag::None, TextAlignment::Left, format!("HP: {}/{} ", attackable.hp, attackable.max_hp));
     }
     
     tcod.panel.set_default_background(BLACK);
@@ -371,10 +351,24 @@ fn next_level(tcod: &mut structures::Tcod, game: &mut structures::Game, objects:
     let heal_hp = objects[config::PLAYER].attackable.map_or(0, |f| f.max_hp / 2);
     objects[config::PLAYER].heal(heal_hp);
 
-    game.messages.add(format!("Prepare to danger on the {} level", game.level), RED);
     game.level += 1;
+    game.messages.add(format!("Prepare to danger on the {} level", game.level), RED);
     game.map = generate_map(objects);
+    monsters_level_up(game, objects);
     initialise_fov(tcod, &game.map);
+}
+
+fn monsters_level_up(game: &mut structures::Game, objects: &mut Vec<structures::Object>) {
+    for id in 1..objects.len() {
+        if let Some(mut attackable) = objects[id].attackable.as_mut() {
+            attackable.damage += config::DAMAGE_PER_LEVEL * game.level as i32;
+            attackable.armor += config::ARMOR_PER_LEVEL * game.level as i32;
+            attackable.max_hp += config::MAX_HP_PER_LEVEL * game.level as i32;
+            attackable.hp = attackable.max_hp;
+            attackable.xp += config::XP_PER_LEVEL * game.level as i32;
+            println!("level up {} XP", attackable.xp);
+        }
+    }
 }
 
 fn handle_keys(tcod: &mut structures::Tcod, game: &mut structures::Game, objects: &mut Vec<structures::Object>) -> structures::PlayerAction {
@@ -390,11 +384,34 @@ fn handle_keys(tcod: &mut structures::Tcod, game: &mut structures::Game, objects
         (Key { code: Escape, .. }, _, _) => Exit,
 
         (Key { code: Number5, .. }, _, true) => {
-            // go down stairs, if the player is on them
             let player_on_stairs = objects.iter().any(|object| object.loc() == objects[config::PLAYER].loc() && object.name == "door");
             if player_on_stairs {
                 next_level(tcod, game, objects);
             }
+            DidnotTakeTurn
+        }
+
+        (Key { code: Number4, .. }, _, true) => {
+            // show character information
+            let player = &objects[config::PLAYER];
+            let level = player.level;
+            let level_up_xp = config::LEVEL_UP_XP_BASE + player.level * config::LEVEL_UP_XP_PER_LEVEL;
+            if let Some(attackable) = player.attackable.as_ref() {
+                let msg = format!(
+                    "Character information
+        
+    Level: {}
+    XP: {}
+    XP to lvl up: {}
+        
+    Maximum HP: {}
+    Attack: {}
+    Defense: {}",
+                    level, attackable.xp, level_up_xp - attackable.xp, attackable.max_hp, attackable.damage, attackable.armor
+                );
+                msgbox(&msg, config::CHARACTER_SCREEN_WIDTH, &mut tcod.root);
+            }
+        
             DidnotTakeTurn
         }
         
@@ -443,16 +460,18 @@ fn handle_keys(tcod: &mut structures::Tcod, game: &mut structures::Game, objects
     
 }
     
+fn msgbox(text: &str, width: i32, root: &mut Root) {
+    let options: &[&str] = &[];
+    menu(text, options, width, root);
+}
 
 fn player_move_or_attack(dx: i32, dy: i32, game: &mut structures::Game, objects: &mut [structures::Object]) {
-    // the coordinates the player is moving to/attacking
     let x = objects[config::PLAYER].x + dx;
     let y = objects[config::PLAYER].y + dy;
 
-    // try to find an attackable object there
     let target_id = objects.iter().position(|object| object.attackable.is_some() && object.loc() == (x, y));
 
-    // attack if target found, move otherwise
+
     match target_id {
         Some(target_id) => {
             let (player, target) = mut_two(config::PLAYER, target_id, objects);
@@ -521,6 +540,43 @@ fn mut_two<T>(first_index: usize, second_index: usize, items: &mut [T]) -> (&mut
     }
 }
 
+fn level_up(tcod: &mut structures::Tcod, game: &mut structures::Game, objects: &mut [structures::Object]) {
+    let player = &mut objects[config::PLAYER];
+    let level_up_xp = config::LEVEL_UP_XP_BASE + player.level * config::LEVEL_UP_XP_PER_LEVEL;
+
+    if player.attackable.as_ref().map_or(0, |f| f.xp) >= level_up_xp {
+        player.level += 1;
+        game.messages.add(format!("You reached level {}!", player.level), YELLOW);
+        let attackable = player.attackable.as_mut().unwrap();
+    let mut choice = None;
+    while choice.is_none() {
+        choice = menu("Level up! Choose a stat to raise:\n",
+            &[
+                format!("(+{} HP, from {})", config::PLAYER_MAX_HP_PER_LEVEL, attackable.max_hp),
+                format!("(+{} attack, from {})", config::PLAYER_DAMAGE_PER_LEVEL, attackable.damage),
+                format!("(+{} defense, from {})", config::PLAYER_ARMOR_PER_LEVEL, attackable.armor),
+            ],
+            config::LEVEL_SCREEN_WIDTH,
+            &mut tcod.root,
+        );
+    }
+    attackable.xp -= level_up_xp;
+    match choice.unwrap() {
+        0 => {
+            attackable.max_hp += config::PLAYER_MAX_HP_PER_LEVEL;
+            attackable.hp = attackable.max_hp;
+        }
+        1 => {
+            attackable.damage += config::PLAYER_DAMAGE_PER_LEVEL;
+        }
+        2 => {
+            attackable.armor += config::PLAYER_ARMOR_PER_LEVEL;
+        }
+        _ => unreachable!(),
+    }
+    }
+}
+
 fn render_bar(panel: &mut Offscreen, x: i32, y: i32, total_width: i32, name: &str, value: i32, maximum: i32, bar_color: Color, back_color: Color) {
     let bar_width = (value as f32 / maximum as f32 * total_width as f32) as i32;
 
@@ -559,7 +615,7 @@ fn main() {
     let mut player = structures::Object::new(5, 5, '@', BLUE, "Player", true);
 
     player.alive = true;
-    player.attackable = Some(structures::Attackable{max_hp: 100, hp: 100, armor: 10, damage: 10, on_death: structures::DeathCallback::Player});
+    player.attackable = Some(structures::Attackable{max_hp: 100, hp: 100, armor: 7, damage: 10, xp: 0, on_death: structures::DeathCallback::Player});
 
     let mut objects = vec![player];
 
@@ -591,7 +647,7 @@ fn main() {
         let fov_recompute = previous_player_position != (objects[config::PLAYER].x, objects[config::PLAYER].y);
         render(&mut tcod, &mut game, &objects, fov_recompute);
         tcod.root.flush();
-
+        level_up(&mut tcod, &mut game, &mut objects);
         previous_player_position = objects[config::PLAYER].loc();
         let player_action = handle_keys(&mut tcod, &mut game, &mut objects);
         if player_action == structures::PlayerAction::Exit {
