@@ -3,7 +3,7 @@ use rand::Rng;
 use tcod::colors::*;
 use tcod::console::*;
 
-mod config; // change for other game
+mod config; 
 mod structures;
 mod skills;
 mod myengine;
