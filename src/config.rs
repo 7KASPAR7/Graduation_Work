@@ -3,16 +3,16 @@ use tcod::colors::*;
 use tcod::map::{FovAlgorithm};
 
 // actual size of the window
-pub const SCREEN_WIDTH: i32 = 80;
-pub const SCREEN_HEIGHT: i32 = 50;
+pub const SCREEN_WIDTH: i32 = 100;
+pub const SCREEN_HEIGHT: i32 = 60;
 
 // size of the map
-pub const MAP_WIDTH: i32 = 80;
-pub const MAP_HEIGHT: i32 = 43;
+pub const MAP_WIDTH: i32 = 100;
+pub const MAP_HEIGHT: i32 = 58;
 
 // bar and panel sizes
-pub const BAR_WIDTH: i32 = 20;
-pub const PANEL_HEIGHT: i32 = 7;
+pub const BAR_WIDTH: i32 = 25;
+pub const PANEL_HEIGHT: i32 = 8;
 pub const PANEL_Y: i32 = SCREEN_HEIGHT - PANEL_HEIGHT;
 pub const INVENTORY_WIDTH: i32 = 50;
 pub const LEVEL_SCREEN_WIDTH: i32 = 40;
@@ -53,9 +53,9 @@ pub const MESSAGES_HEIGHT: usize = PANEL_HEIGHT as usize - 1;
 // rooms
 pub const ROOM_MAX_SIZE: i32 = 10;
 pub const ROOM_MIN_SIZE: i32 = 6;
-pub const MAX_ROOMS: i32 = 15;
-pub const MAX_ROOM_MONSTERS: i32 = 2;
-pub const MAX_ROOM_ITEMS: i32 = 1;
+pub const MAX_ROOMS: i32 = 19;
+pub const MAX_ROOM_MONSTERS: i32 = 3;
+pub const MAX_ROOM_ITEMS: i32 = 2;
 
 // colors
 pub const COLOR_LIGHT_WALL: Color = Color {r: 106, g: 10, b: 171};

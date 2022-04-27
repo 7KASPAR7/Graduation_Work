@@ -1,7 +1,7 @@
 use tcod::colors::*;
 
 use crate::structures;
-use crate::config;
+use crate::config as config; // change for other game
 
 pub fn cast_heal(_inventory_id: usize, _tcod: &mut structures::Tcod, game: &mut structures::Game, objects: &mut [structures::Object]) -> structures::UseResult {
     if let Some(attackable) = objects[config::PLAYER].attackable {
