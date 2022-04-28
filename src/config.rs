@@ -3,16 +3,16 @@ use tcod::colors::*;
 use tcod::map::{FovAlgorithm};
 
 // actual size of the window
-pub const SCREEN_WIDTH: i32 = 100;
-pub const SCREEN_HEIGHT: i32 = 60;
+pub const SCREEN_WIDTH: i32 = 80;
+pub const SCREEN_HEIGHT: i32 = 50;
 
 // size of the map
-pub const MAP_WIDTH: i32 = 100;
-pub const MAP_HEIGHT: i32 = 58;
+pub const MAP_WIDTH: i32 = 80;
+pub const MAP_HEIGHT: i32 = 43;
 
 // bar and panel sizes
-pub const BAR_WIDTH: i32 = 25;
-pub const PANEL_HEIGHT: i32 = 8;
+pub const BAR_WIDTH: i32 = 20;
+pub const PANEL_HEIGHT: i32 = 7;
 pub const PANEL_Y: i32 = SCREEN_HEIGHT - PANEL_HEIGHT;
 pub const INVENTORY_WIDTH: i32 = 50;
 pub const LEVEL_SCREEN_WIDTH: i32 = 40;
