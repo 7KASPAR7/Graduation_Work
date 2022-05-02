@@ -1,27 +1,20 @@
 
 use winit::event_loop::EventLoop;
-use std::env;
-use std::fs::File;
-use std::io::Write;
 
 use crate::structures;
 use crate::config;
 use crate::myengine;
 
+use std::env;
+use std::fs::File;
+use std::io::Write;
+
 pub fn write() {
     // Create a temporary file.
-    let temp_directory = env::temp_dir();
-    let temp_file = temp_directory.join("file");
-
-    // Open a file in write-only (ignoring errors).
-    // This creates the file if it does not exist (and empty the file if it exists).
-    let mut file = File::create(temp_file).unwrap();
-
-    // Write a &str in the file (ignoring the result).
-    writeln!(&mut file, "Hello World!").unwrap();
-
-    // Write a byte string.
-    file.write(b"Bytes\n").unwrap();
+    let mut my_file = std::fs::File::create("my_document.txt").expect("creation failed");
+    my_file.write_all("Hello Chercher.tech".as_bytes()).expect("write failed");
+    my_file.write_all("	 Learning is Fun".as_bytes()).expect("write failed");
+    println!("The tag line of Chercher.tech has been added, open the file to see :)");
 }
 
 pub fn first() {
@@ -126,4 +119,86 @@ pub fn first() {
     });
 }
 
+use tcod::input::Key;
+use tcod::input::KeyCode::*;
+use druid::widget::{Align, Flex, Label, TextBox};
+use druid::{AppLauncher, Data, Env, Lens, LocalizedString, Widget, WindowDesc, WidgetExt};
+
+const VERTICAL_WIDGET_SPACING: f64 = 20.0;
+const TEXT_BOX_WIDTH: f64 = 200.0;
+const WINDOW_TITLE: LocalizedString<HelloState> = LocalizedString::new("Monsters Editor");
+
+#[derive(Clone, Data, Lens)]
+struct HelloState {
+    symbol: String,
+    max_hp: String,
+    damage: String,
+    armor: String,
+    color: String,
+}
+
+pub fn second() {
+      
+    let main_window = WindowDesc::new(build_root_widget)
+    .title(WINDOW_TITLE)
+    .window_size((400.0, 400.0));
+
+    // create the initial app state
+    let initial_state = HelloState {
+        symbol: "".into(),
+        max_hp: "".into(),
+        damage: "".into(),
+        armor: "".into(),
+        color: "".into(),
+    };
+
+    // start the application
+    AppLauncher::with_window(main_window)
+        .launch(initial_state)
+        .expect("Failed to launch application");    
+}
+
+fn build_root_widget() -> impl Widget<HelloState> {
+    // a textbox that modifies `name`.
+
+    let symbol_textbox = TextBox::new()
+    .with_placeholder("What is symbol?")
+    .fix_width(TEXT_BOX_WIDTH)
+    .lens(HelloState::symbol);
+
+    let max_hp_textbox = TextBox::new()
+        .with_placeholder("What is max HP?")
+        .fix_width(TEXT_BOX_WIDTH)
+        .lens(HelloState::max_hp);
+
+    let damage_textbox = TextBox::new()
+        .with_placeholder("What is damage?")
+        .fix_width(TEXT_BOX_WIDTH)
+        .lens(HelloState::damage);
+
+    let armor_textbox = TextBox::new()
+        .with_placeholder("What is armor?")
+        .fix_width(TEXT_BOX_WIDTH)
+        .lens(HelloState::armor);
+    
+    let color_textbox = TextBox::new()
+        .with_placeholder("What is color?")
+        .fix_width(TEXT_BOX_WIDTH)
+        .lens(HelloState::color);
+
+    // arrange the two widgets vertically, with some padding
+    let layout = Flex::column()
+        .with_child(symbol_textbox)
+        .with_spacer(VERTICAL_WIDGET_SPACING)
+        .with_child(max_hp_textbox)
+        .with_spacer(VERTICAL_WIDGET_SPACING)
+        .with_child(damage_textbox)
+        .with_spacer(VERTICAL_WIDGET_SPACING)
+        .with_child(armor_textbox)
+        .with_spacer(VERTICAL_WIDGET_SPACING)
+        .with_child(color_textbox);
+
+    // center the two widgets in the available space
+    Align::centered(layout)
+}
 

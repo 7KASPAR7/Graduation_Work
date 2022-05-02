@@ -9,6 +9,7 @@ mod editor;
 
 fn main() {
     //rogulikegame::play();
-    editor::first();
+    editor::second();
+    //editor::write();
 }
 
