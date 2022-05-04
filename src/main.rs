@@ -9,8 +9,8 @@ mod map_editor;
 
 fn main() {
     //rogulikegame::play();
-    //editor::monsters_editor();
+    editor::monsters_editor();
     //editor::write();
-    map_editor::map_editor();
+    //map_editor::map_editor();
 }
 

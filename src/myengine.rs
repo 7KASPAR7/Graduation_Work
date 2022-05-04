@@ -4,6 +4,10 @@ use std::cmp;
 use rand::Rng;
 use tcod::console::*;
 
+use std::env;
+use std::fs::File;
+use std::io::Write;
+
 use tcod::map::{Map as FovMap};
 
 use crate::skills;
@@ -448,4 +452,17 @@ pub fn monster_move(id: usize, player_x: i32, player_y: i32, map: &structures::M
     let dy = (dy as f32 / distance).round() as i32;
 
     move_by(id, dx, dy, map, objects);
+}
+
+pub fn write() {
+    let mut my_file = std::fs::File::create(config::CONFIG_FILE_NAME).expect("creation failed");
+    my_file.write_all("Hello Chercher.tech".as_bytes()).expect("write failed");
+    //my_file.write(monster_name.as_bytes()).expect("Name write failed");
+    my_file.write_all("	 Learning is Fun".as_bytes()).expect("write failed");
+    println!("The tag line of Chercher.tech has been added, open the file to see :)");
+}
+
+pub fn remove() {
+    std::fs::remove_file(config::CONFIG_FILE_NAME).expect("could not remove file");
+    println!("The file has been removed !");
 }

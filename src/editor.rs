@@ -1,13 +1,7 @@
 
-use winit::event_loop::EventLoop;
-
 use crate::structures;
 use crate::config;
 use crate::myengine;
-
-use std::env;
-use std::fs::File;
-use std::io::Write;
 
 use druid::widget::{Align, Button, Flex, Label, TextBox};
 use druid::{AppLauncher, Data, Env, Lens, LocalizedString, FileDialogOptions, Widget, WindowDesc, WidgetExt, FileSpec};
@@ -16,20 +10,6 @@ const VERTICAL_WIDGET_SPACING: f64 = 20.0;
 const TEXT_BOX_WIDTH: f64 = 200.0;
 const WINDOW_TITLE: LocalizedString<HelloState> = LocalizedString::new("Monsters Editor");
 
-const CONFIG_FILE_NAME: &str = "my_config.txt";
-
-pub fn write() {
-    let mut my_file = std::fs::File::create(CONFIG_FILE_NAME).expect("creation failed");
-    my_file.write_all("Hello Chercher.tech".as_bytes()).expect("write failed");
-    //my_file.write(monster_name.as_bytes()).expect("Name write failed");
-    my_file.write_all("	 Learning is Fun".as_bytes()).expect("write failed");
-    println!("The tag line of Chercher.tech has been added, open the file to see :)");
-}
-
-pub fn remove() {
-    std::fs::remove_file(CONFIG_FILE_NAME).expect("could not remove file");
-    println!("The file has been removed !");
-}
 
 #[derive(Clone, Data, Lens)]
 struct HelloState {
@@ -95,10 +75,11 @@ fn build_root_widget() -> impl Widget<HelloState> {
         .lens(HelloState::color);
 
     let save = Button::new("Save this monster").on_click(move |_, _, _| {
-            write();
+            myengine::write();
         });
+
     let remove = Button::new("Remove existing config").on_click(move |_, _, _| {
-            remove();
+            myengine::remove();
         });
 
     let layout = Flex::column()
@@ -149,7 +130,7 @@ fn build_root_menu_widget() -> impl Widget<HelloState> {
 
     });
     let play_button = Button::new("Play").on_click(move |_, _, _| {
-
+        
     });
 
 
