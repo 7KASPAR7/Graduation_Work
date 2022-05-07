@@ -4,6 +4,7 @@ use winit::event_loop::EventLoop;
 use crate::structures;
 use crate::config;
 use crate::myengine;
+use crate::rogulikegame;
 
 use std::env;
 use std::fs::File;
@@ -93,6 +94,7 @@ fn build_root_widget() -> impl Widget<HelloState> {
         .lens(HelloState::dark_ground_color);
 
     let generate_map_button = Button::new("generate map").on_click(move |_, _, _| {
+        rogulikegame::play();
         });
 
     // arrange the two widgets vertically, with some padding

@@ -25,37 +25,6 @@ pub struct MonsterConfigJson {
     pub saved_configs: Vec<MonsterConfig>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-struct Greeting {
-    status: String,
-    content: String
-}
-
-
-
-pub fn print_greeting() {
-    let greeting = Greeting { status: "success".to_string(), content: "damage".to_string() };
-    let serialized = serde_json::to_string(&greeting).unwrap();
-    println!("Serialized: {}", serialized);
-    let deserialized: Greeting = serde_json::from_str(&serialized).unwrap();
-    println!("Deserialized: {:?}", deserialized);
-}
-pub fn print_person() {
-    let json = r#"
-    {
-      "symbol": "R",
-      "name": "Troll",
-      "max_hp": 30,
-      "damage": 7,
-      "armor": 4,
-      "color": "Violet"
-    }
-"#;
-
-let person: MonsterConfig = serde_json::from_str(json).unwrap();
-
-println!("{:?}", person);
-}
 
 pub struct Tcod {
     pub root: Root,
@@ -234,6 +203,7 @@ pub struct Game{
     pub inventory: Vec<Object>,
     pub level: u32,
 }
+
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum PlayerAction {
