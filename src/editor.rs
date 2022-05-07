@@ -7,18 +7,21 @@ use druid::widget::{Align, Button, Flex, Label, TextBox};
 use druid::{AppLauncher, Data, Env, Lens, LocalizedString, FileDialogOptions, Widget, WindowDesc, WidgetExt, FileSpec};
 
 const VERTICAL_WIDGET_SPACING: f64 = 20.0;
+const SMALL_VERTICAL_WIDGET_SPACING: f64 = 10.0;
 const TEXT_BOX_WIDTH: f64 = 200.0;
 const WINDOW_TITLE: LocalizedString<HelloState> = LocalizedString::new("Monsters Editor");
 
 
 #[derive(Clone, Data, Lens)]
-struct HelloState {
-    symbol: String,
-    name: String,
-    max_hp: String,
-    damage: String,
-    armor: String,
-    color: String,
+pub struct HelloState {
+    pub symbol: String,
+    pub name: String,
+    pub max_hp: String,
+    pub damage: String,
+    pub armor: String,
+    pub r: String,
+    pub g: String,
+    pub b: String,
 }
 
 pub fn monsters_editor() {
@@ -33,7 +36,9 @@ pub fn monsters_editor() {
         max_hp: "".into(),
         damage: "".into(),
         armor: "".into(),
-        color: "".into(),
+        r: "".into(),
+        g: "".into(),
+        b: "".into(),
     };
 
 
@@ -69,13 +74,23 @@ fn build_root_widget() -> impl Widget<HelloState> {
         .fix_width(TEXT_BOX_WIDTH)
         .lens(HelloState::armor);
     
-    let color_textbox = TextBox::new()
-        .with_placeholder("What is color?")
+    let r_textbox = TextBox::new()
+        .with_placeholder("What is red?")
         .fix_width(TEXT_BOX_WIDTH)
-        .lens(HelloState::color);
+        .lens(HelloState::r);
+    let g_textbox = TextBox::new()
+        .with_placeholder("What is green?")
+        .fix_width(TEXT_BOX_WIDTH)
+        .lens(HelloState::g);
+    let b_textbox = TextBox::new()
+        .with_placeholder("What is blue?")
+        .fix_width(TEXT_BOX_WIDTH)
+        .lens(HelloState::b);    
+    let data: &HelloState;
 
-    let save = Button::new("Save this monster").on_click(move |_, _, _| {
-            myengine::write();
+
+    let save = Button::new("Save this monster").on_click(move |_, data: &mut HelloState, _| {
+        myengine::write(data);
         });
 
     let remove = Button::new("Remove existing config").on_click(move |_, _, _| {
@@ -93,7 +108,11 @@ fn build_root_widget() -> impl Widget<HelloState> {
         .with_spacer(VERTICAL_WIDGET_SPACING)
         .with_child(armor_textbox)
         .with_spacer(VERTICAL_WIDGET_SPACING)
-        .with_child(color_textbox)
+        .with_child(r_textbox)
+        .with_spacer(SMALL_VERTICAL_WIDGET_SPACING)
+        .with_child(g_textbox)
+        .with_spacer(SMALL_VERTICAL_WIDGET_SPACING)
+        .with_child(b_textbox)
         .with_spacer(VERTICAL_WIDGET_SPACING)
         .with_child(save)
         .with_spacer(VERTICAL_WIDGET_SPACING)
@@ -113,7 +132,9 @@ pub fn play_menu() {
         max_hp: "".into(),
         damage: "".into(),
         armor: "".into(),
-        color: "".into(),
+        r: "".into(),
+        g: "".into(),
+        b: "".into(),
     };
 
     AppLauncher::with_window(main_window)

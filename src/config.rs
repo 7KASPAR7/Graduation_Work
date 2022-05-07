@@ -74,4 +74,4 @@ pub const PLAYER: usize = 0;
 // fps
 pub const LIMIT_FPS: i32 = 20; // 20 frames-per-second maximum
 
-pub const CONFIG_FILE_NAME: &str = "my_config.txt";
+pub const CONFIG_FILE_NAME: &str = "my_config.json";

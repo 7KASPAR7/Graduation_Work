@@ -13,6 +13,11 @@ use tcod::map::{Map as FovMap};
 use crate::skills;
 use crate::structures;
 use crate::config as config; // Change for other game
+use crate::editor;
+
+use std::path::Path;
+
+extern crate ajson;
 
 
 fn create_room(room: structures::Rect, map: &mut structures::Map) {
@@ -196,23 +201,29 @@ pub fn generate_map(objects: &mut Vec<structures::Object>) -> structures::Map {
     map
 }
 
+fn get_config() ->  Vec<structures::MonsterConfig> {
+    let my_existing_file = std::fs::File::open(config::CONFIG_FILE_NAME).unwrap();
+    let json = ajson::parse_from_read(my_existing_file).unwrap();   
+    let monsters_list = json.get("saved_configs").unwrap();
+    let mut deserialized: Vec<structures::MonsterConfig> = serde_json::from_str(&monsters_list.as_str()).unwrap();
+    deserialized
+}
+
 fn spawn_objects(room: structures::Rect, map: &structures::Map, objects: &mut Vec<structures::Object>) {
     
     let monster_num = rand::thread_rng().gen_range(0..config::MAX_ROOM_MONSTERS + 1);
-    
+    let monsters_list = get_config();
+
     for _ in 0..monster_num {
         let x = rand::thread_rng().gen_range(room.x1..room.x2+1);
         let y = rand::thread_rng().gen_range(room.y1..room.y2+1);
         if !is_blocked(x, y, map, objects) {
             let mut monster;
-            if rand::random::<f32>() < config::ORC_SPAWN_CHANCE {
-                monster = structures::Object::new(x, y, 'O', DESATURATED_PURPLE, "Orc", true);
-                monster.attackable = Some(structures::Attackable{max_hp: 30, hp: 30, armor: 4, damage: 10, xp: 75, on_death: structures::DeathCallback::Monster})
-            } 
-            else {
-                monster = structures::Object::new(x, y, 'T', DESATURATED_ORANGE, "Troll", true);
-                monster.attackable = Some(structures::Attackable{max_hp: 50, hp: 50, armor: 6, damage: 7, xp: 100, on_death: structures::DeathCallback::Monster})
-            } 
+            let num = rand::thread_rng().gen_range(0..monsters_list.len());
+            let data = &monsters_list[num];
+            let color = Color {r: data.r, g: data.g, b: data.b};
+            monster = structures::Object::new(x, y, data.symbol, color, &data.name, true);
+            monster.attackable = Some(structures::Attackable{max_hp: data.max_hp, hp: data.max_hp, armor: data.armor, damage: data.damage, xp: 75, on_death: structures::DeathCallback::Monster});
             monster.alive = true;
             monster.ai = Some(structures::Ai::Basic);
             objects.push(monster);
@@ -454,12 +465,55 @@ pub fn monster_move(id: usize, player_x: i32, player_y: i32, map: &structures::M
     move_by(id, dx, dy, map, objects);
 }
 
-pub fn write() {
-    let mut my_file = std::fs::File::create(config::CONFIG_FILE_NAME).expect("creation failed");
-    my_file.write_all("Hello Chercher.tech".as_bytes()).expect("write failed");
-    //my_file.write(monster_name.as_bytes()).expect("Name write failed");
-    my_file.write_all("	 Learning is Fun".as_bytes()).expect("write failed");
-    println!("The tag line of Chercher.tech has been added, open the file to see :)");
+pub fn write(data: &editor::HelloState) {
+
+    let monster = structures::MonsterConfig { 
+        symbol: data.symbol.chars().nth(0).unwrap() as char, 
+        name: data.name.to_string(),
+        max_hp: data.max_hp.parse::<i32>().unwrap(),
+        damage: data.damage.parse::<i32>().unwrap(),
+        armor: data.armor.parse::<i32>().unwrap(),
+        r: data.r.parse::<u8>().unwrap(),
+        g: data.g.parse::<u8>().unwrap(),
+        b: data.b.parse::<u8>().unwrap(),
+    };
+
+    if !Path::new(config::CONFIG_FILE_NAME).exists(){
+        let mut my_file = std::fs::File::create(config::CONFIG_FILE_NAME).expect("creation failed");
+        let mut monsterConfigList = vec![monster];
+        let mut monsterConfigJson = structures::MonsterConfigJson {
+            saved_configs: monsterConfigList,
+        };
+        let serialized = serde_json::to_string(&monsterConfigJson).unwrap();
+        my_file.write(serialized.as_bytes());
+
+    } else {
+        let my_existing_file = std::fs::File::open(config::CONFIG_FILE_NAME).unwrap();
+        let json = ajson::parse_from_read(my_existing_file).unwrap();   
+        let monsters_list = json.get("saved_configs").unwrap();
+        let mut deserialized: Vec<structures::MonsterConfig> = serde_json::from_str(&monsters_list.as_str()).unwrap();
+        deserialized.push(monster);
+        let mut monsterConfigJson = structures::MonsterConfigJson {
+            saved_configs: deserialized,
+        };
+        let mut my_file = std::fs::File::create(config::CONFIG_FILE_NAME).expect("creation failed");
+        let serialized = serde_json::to_string(&monsterConfigJson).unwrap();
+        my_file.write(serialized.as_bytes());
+    }
+     //let deserialized: Vec<structures::MonsterConfig> = serde_json::from_str(&serialized).unwrap();
+    // //my_file.write_all("Hello Chercher.tech".as_bytes()).expect("write failed");
+    // my_file.write(data.name.as_bytes()).expect("Name write failed");
+    // //my_file.write_all("	 Learning is Fun".as_bytes()).expect("write failed");
+    // println!("The tag line of Chercher.tech has been added, open the file to see :)");
+    
+    
+
+
+    // my_file.write(serialized.as_bytes());
+
+    // println!("Serialized: {}", serialized);
+    // let deserialized: structures::MonsterConfig = serde_json::from_str(&serialized).unwrap();
+    // println!("Deserialized: {:?}", deserialized);
 }
 
 pub fn remove() {

@@ -3,6 +3,60 @@ use tcod::console::*;
 
 use tcod::map::{Map as FovMap};
 
+
+use serde;
+use serde_derive::*;
+use serde_json;
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct MonsterConfig {
+    pub symbol: char,
+    pub name: String,
+    pub max_hp: i32,
+    pub damage: i32,
+    pub armor: i32,
+    pub r: u8,
+    pub g: u8,
+    pub b: u8,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct MonsterConfigJson {
+    pub saved_configs: Vec<MonsterConfig>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct Greeting {
+    status: String,
+    content: String
+}
+
+
+
+pub fn print_greeting() {
+    let greeting = Greeting { status: "success".to_string(), content: "damage".to_string() };
+    let serialized = serde_json::to_string(&greeting).unwrap();
+    println!("Serialized: {}", serialized);
+    let deserialized: Greeting = serde_json::from_str(&serialized).unwrap();
+    println!("Deserialized: {:?}", deserialized);
+}
+pub fn print_person() {
+    let json = r#"
+    {
+      "symbol": "R",
+      "name": "Troll",
+      "max_hp": 30,
+      "damage": 7,
+      "armor": 4,
+      "color": "Violet"
+    }
+"#;
+
+let person: MonsterConfig = serde_json::from_str(json).unwrap();
+
+println!("{:?}", person);
+}
+
 pub struct Tcod {
     pub root: Root,
     pub screen: Offscreen,
@@ -10,6 +64,9 @@ pub struct Tcod {
     pub panel: Offscreen,
 }
 
+fn print_type_of<T>(_: &T) {
+    println!("{}", std::any::type_name::<T>())
+}
 
 // all map is only tiles
 #[derive(Clone, Copy, Debug)]

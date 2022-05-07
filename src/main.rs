@@ -12,5 +12,6 @@ fn main() {
     editor::monsters_editor();
     //editor::write();
     //map_editor::map_editor();
+    //structures::print_person();
 }
 
