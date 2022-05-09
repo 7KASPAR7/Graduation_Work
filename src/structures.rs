@@ -3,10 +3,7 @@ use tcod::console::*;
 
 use tcod::map::{Map as FovMap};
 
-
-use serde;
 use serde_derive::*;
-use serde_json;
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct MonsterConfig {
@@ -25,6 +22,27 @@ pub struct MonsterConfigJson {
     pub saved_configs: Vec<MonsterConfig>,
 }
 
+#[derive(Debug, Deserialize, Serialize)]
+pub struct MapConfig {
+    pub light_wall_r: u8,
+    pub light_wall_g: u8,
+    pub light_wall_b: u8,
+    pub dark_wall_r: u8,
+    pub dark_wall_g: u8,
+    pub dark_wall_b: u8,
+    pub light_ground_r: u8,
+    pub light_ground_g: u8,
+    pub light_ground_b: u8,
+    pub dark_ground_r: u8,
+    pub dark_ground_g: u8,
+    pub dark_ground_b: u8,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct MapConfigJson {
+    pub saved_configs: MapConfig,
+}
+
 
 pub struct Tcod {
     pub root: Root,
@@ -33,9 +51,6 @@ pub struct Tcod {
     pub panel: Offscreen,
 }
 
-fn print_type_of<T>(_: &T) {
-    println!("{}", std::any::type_name::<T>())
-}
 
 // all map is only tiles
 #[derive(Clone, Copy, Debug)]

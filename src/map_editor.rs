@@ -1,31 +1,31 @@
-
-use winit::event_loop::EventLoop;
-
 use crate::structures;
 use crate::config;
 use crate::myengine;
-use crate::rogulikegame;
 
-use std::env;
-use std::fs::File;
-use std::io::Write;
+use tcod::console::*;
 
-use druid::widget::{Align, Button, Flex, Label, TextBox};
-use druid::{AppLauncher, Data, Env, Lens, LocalizedString, FileDialogOptions, Widget, WindowDesc, WidgetExt, FileSpec};
+use std::thread;
 
-const VERTICAL_WIDGET_SPACING: f64 = 20.0;
-const TEXT_BOX_WIDTH: f64 = 200.0;
+use druid::widget::{Align, Button, Flex, TextBox};
+use druid::{AppLauncher, Data, Lens, LocalizedString, Widget, WindowDesc, WidgetExt};
+
 const WINDOW_TITLE: LocalizedString<HelloState> = LocalizedString::new("Map Editor");
-
-const CONFIG_FILE_NAME: &str = "my_config.txt";
 
 
 #[derive(Clone, Data, Lens)]
-struct HelloState {
-    light_wall_color: String,
-    dark_wall_color: String,
-    light_ground_color: String,
-    dark_ground_color: String,
+pub struct HelloState {
+    pub light_wall_color_r: String,
+    pub light_wall_color_g: String,
+    pub light_wall_color_b: String,
+    pub dark_wall_color_r: String,
+    pub dark_wall_color_g: String,
+    pub dark_wall_color_b: String,
+    pub light_ground_color_r: String,
+    pub light_ground_color_g: String,
+    pub light_ground_color_b: String,
+    pub dark_ground_color_r: String,
+    pub dark_ground_color_g: String,
+    pub dark_ground_color_b: String,
 }
 
 pub fn map_editor() {
@@ -36,16 +36,24 @@ pub fn map_editor() {
 
     // create the initial app state
     let initial_state = HelloState {
-        light_wall_color: "".into(),
-        dark_wall_color: "".into(),
-        light_ground_color: "".into(),
-        dark_ground_color: "".into(),
+        light_wall_color_r: "".into(),
+        light_wall_color_g: "".into(),
+        light_wall_color_b: "".into(),
+        dark_wall_color_r: "".into(),
+        dark_wall_color_g: "".into(),
+        dark_wall_color_b: "".into(),
+        light_ground_color_r: "".into(),
+        light_ground_color_g: "".into(),
+        light_ground_color_b: "".into(),
+        dark_ground_color_r: "".into(),
+        dark_ground_color_g: "".into(),
+        dark_ground_color_b: "".into(),
     };
 
     // start the application
     AppLauncher::with_window(main_window)
         .launch(initial_state)
-        .expect("Failed to launch application");    
+        .expect("Failed to launch application");   
 }
 
 fn build_root_widget() -> impl Widget<HelloState> {
@@ -70,45 +78,99 @@ fn build_root_widget() -> impl Widget<HelloState> {
         }
     }
 
-    myengine::render(&mut tcod, &mut game, &objects, true);
-    tcod.root.flush();
+    thread::spawn(move|| {
+        while !tcod.root.window_closed() {
+            tcod.screen.clear();
+            myengine::render(&mut tcod, &mut game, &objects, true);
+            tcod.root.flush();
+        }
+    }); 
     
-    let light_wall_textbox = TextBox::new()
-        .with_placeholder("What is RGB?")
-        .fix_width(TEXT_BOX_WIDTH)
-        .lens(HelloState::light_wall_color);
+    let light_wall_r_textbox = TextBox::new()
+        .with_placeholder("What is light wall red?")
+        .fix_width(config::TEXT_BOX_WIDTH)
+        .lens(HelloState::light_wall_color_r);
+    let light_wall_g_textbox = TextBox::new()
+        .with_placeholder("What is light wall green?")
+        .fix_width(config::TEXT_BOX_WIDTH)
+        .lens(HelloState::light_wall_color_g);
+    let light_wall_b_textbox = TextBox::new()
+        .with_placeholder("What is light wall blue?")
+        .fix_width(config::TEXT_BOX_WIDTH)
+        .lens(HelloState::light_wall_color_b);
 
-    let dark_wall_textbox = TextBox::new()
-        .with_placeholder("What is RGB?")
-        .fix_width(TEXT_BOX_WIDTH)
-        .lens(HelloState::dark_wall_color);
+    let dark_wall_r_textbox = TextBox::new()
+        .with_placeholder("What is dark wall red?")
+        .fix_width(config::TEXT_BOX_WIDTH)
+        .lens(HelloState::dark_wall_color_r);
+    let dark_wall_g_textbox = TextBox::new()
+        .with_placeholder("What is dark wall green?")
+        .fix_width(config::TEXT_BOX_WIDTH)
+        .lens(HelloState::dark_wall_color_g);
+    let dark_wall_b_textbox = TextBox::new()
+        .with_placeholder("What is dark wall blue?")
+        .fix_width(config::TEXT_BOX_WIDTH)
+        .lens(HelloState::dark_wall_color_b);
     
-    let light_ground_textbox = TextBox::new()
-        .with_placeholder("What is RGB?")
-        .fix_width(TEXT_BOX_WIDTH)
-        .lens(HelloState::light_ground_color);
+    let light_ground_r_textbox = TextBox::new()
+        .with_placeholder("What is light ground red?")
+        .fix_width(config::TEXT_BOX_WIDTH)
+        .lens(HelloState::light_ground_color_r);
+    let light_ground_g_textbox = TextBox::new()
+        .with_placeholder("What is light ground green?")
+        .fix_width(config::TEXT_BOX_WIDTH)
+        .lens(HelloState::light_ground_color_g);
+    let light_ground_b_textbox = TextBox::new()
+        .with_placeholder("What is light ground blue?")
+        .fix_width(config::TEXT_BOX_WIDTH)
+        .lens(HelloState::light_ground_color_b);
         
-    let dark_ground_textbox = TextBox::new()
-        .with_placeholder("What is RGB?")
-        .fix_width(TEXT_BOX_WIDTH)
-        .lens(HelloState::dark_ground_color);
+    let dark_ground_r_textbox = TextBox::new()
+        .with_placeholder("What is dark ground red?")
+        .fix_width(config::TEXT_BOX_WIDTH)
+        .lens(HelloState::dark_ground_color_r);
+    let dark_ground_g_textbox = TextBox::new()
+        .with_placeholder("What is dark ground green?")
+        .fix_width(config::TEXT_BOX_WIDTH)
+        .lens(HelloState::dark_ground_color_g);
+    let dark_ground_b_textbox = TextBox::new()
+        .with_placeholder("What is dark ground blue?")
+        .fix_width(config::TEXT_BOX_WIDTH)
+        .lens(HelloState::dark_ground_color_b);
 
-    let generate_map_button = Button::new("generate map").on_click(move |_, _, _| {
-        rogulikegame::play();
+    let _data: &HelloState;
+    let generate_map_button = Button::new("generate map").on_click(move |_, _data: &mut HelloState, _| {
+        myengine::write_map(_data);
         });
 
     // arrange the two widgets vertically, with some padding
     let layout = Flex::column()
-        .with_child(light_wall_textbox)
-        .with_spacer(VERTICAL_WIDGET_SPACING)
-        .with_child(dark_wall_textbox)
-        .with_spacer(VERTICAL_WIDGET_SPACING)
-        .with_child(light_ground_textbox)
-        .with_spacer(VERTICAL_WIDGET_SPACING)
-        .with_child(dark_ground_textbox)
-        .with_spacer(VERTICAL_WIDGET_SPACING)
+        .with_child(light_wall_r_textbox)
+        .with_spacer(config::SMALL_VERTICAL_WIDGET_SPACING)
+        .with_child(light_wall_g_textbox)
+        .with_spacer(config::SMALL_VERTICAL_WIDGET_SPACING)
+        .with_child(light_wall_b_textbox)
+        .with_spacer(config::VERTICAL_WIDGET_SPACING)
+        .with_child(dark_wall_r_textbox)
+        .with_spacer(config::SMALL_VERTICAL_WIDGET_SPACING)
+        .with_child(dark_wall_g_textbox)
+        .with_spacer(config::SMALL_VERTICAL_WIDGET_SPACING)
+        .with_child(dark_wall_b_textbox)
+        .with_spacer(config::VERTICAL_WIDGET_SPACING)
+        .with_child(light_ground_r_textbox)
+        .with_spacer(config::SMALL_VERTICAL_WIDGET_SPACING)
+        .with_child(light_ground_g_textbox)
+        .with_spacer(config::SMALL_VERTICAL_WIDGET_SPACING)
+        .with_child(light_ground_b_textbox)
+        .with_spacer(config::VERTICAL_WIDGET_SPACING)
+        .with_child(dark_ground_r_textbox)
+        .with_spacer(config::SMALL_VERTICAL_WIDGET_SPACING)
+        .with_child(dark_ground_g_textbox)
+        .with_spacer(config::SMALL_VERTICAL_WIDGET_SPACING)
+        .with_child(dark_ground_b_textbox)
+        .with_spacer(config::VERTICAL_WIDGET_SPACING)
         .with_child(generate_map_button);
-
+    
     // center the two widgets in the available space
     Align::centered(layout)
 }

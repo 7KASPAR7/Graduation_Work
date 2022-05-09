@@ -4,8 +4,6 @@ use std::cmp;
 use rand::Rng;
 use tcod::console::*;
 
-use std::env;
-use std::fs::File;
 use std::io::Write;
 
 use tcod::map::{Map as FovMap};
@@ -14,6 +12,7 @@ use crate::skills;
 use crate::structures;
 use crate::config as config; // Change for other game
 use crate::editor;
+use crate::map_editor;
 
 use std::path::Path;
 
@@ -64,6 +63,13 @@ pub fn use_item(inventory_id: usize, tcod: &mut structures::Tcod, game: &mut  st
 
 pub fn render(tcod: &mut structures::Tcod, game: &mut structures::Game, objects: &[structures::Object], fov_recompute: bool) {
 
+    let data = get_map_config();
+    let dark_wall_color = Color {r: data.dark_wall_r, g: data.dark_wall_g, b: data.dark_wall_b};
+    let light_wall_color = Color {r: data.light_wall_r, g: data.light_wall_g, b: data.light_wall_b};
+    let dark_ground_color = Color {r: data.dark_ground_r, g: data.dark_ground_g, b: data.dark_ground_b};
+    let light_ground_color = Color {r: data.light_ground_r, g: data.light_ground_g, b: data.light_ground_b};
+
+
     if fov_recompute {
         let player = &objects[config::PLAYER];
         tcod.fov.compute_fov(player.x, player.y, config::FOV_RADIUS, config::FOV_LIGHT_WALLS, config::FOV_ALG);
@@ -74,11 +80,11 @@ pub fn render(tcod: &mut structures::Tcod, game: &mut structures::Game, objects:
             let visible = tcod.fov.is_in_fov(x, y);
             let wall = game.map[x as usize][y as usize].is_visible;
             let color = match (visible, wall) {
-                (false, true) => config::COLOR_DARK_WALL,
-                (false, false) => config::COLOR_DARK_GROUND,
+                (false, true) => dark_wall_color,
+                (false, false) => dark_ground_color,
 
-                (true, true) => config::COLOR_LIGHT_WALL,
-                (true, false) => config::COLOR_LIGHT_GROUND,
+                (true, true) => light_wall_color,
+                (true, false) => light_ground_color,
             };
 
             let explored = &mut game.map[x as usize][y as usize].is_explored;
@@ -201,18 +207,26 @@ pub fn generate_map(objects: &mut Vec<structures::Object>) -> structures::Map {
     map
 }
 
-fn get_config() ->  Vec<structures::MonsterConfig> {
-    let my_existing_file = std::fs::File::open(config::CONFIG_FILE_NAME).unwrap();
+fn get_monster_config() ->  Vec<structures::MonsterConfig> {
+    let my_existing_file = std::fs::File::open(config::CONFIG_MONSTER_FILE_NAME).unwrap();
     let json = ajson::parse_from_read(my_existing_file).unwrap();   
     let monsters_list = json.get("saved_configs").unwrap();
-    let mut deserialized: Vec<structures::MonsterConfig> = serde_json::from_str(&monsters_list.as_str()).unwrap();
+    let deserialized: Vec<structures::MonsterConfig> = serde_json::from_str(&monsters_list.as_str()).unwrap();
+    deserialized
+}
+
+fn get_map_config() ->  structures::MapConfig {
+    let my_existing_file = std::fs::File::open(config::CONFIG_MAP_FILE_NAME).unwrap();
+    let json = ajson::parse_from_read(my_existing_file).unwrap();   
+    let map_colors = json.get("saved_configs").unwrap();
+    let deserialized: structures::MapConfig = serde_json::from_str(&map_colors.as_str()).unwrap();
     deserialized
 }
 
 fn spawn_objects(room: structures::Rect, map: &structures::Map, objects: &mut Vec<structures::Object>) {
     
     let monster_num = rand::thread_rng().gen_range(0..config::MAX_ROOM_MONSTERS + 1);
-    let monsters_list = get_config();
+    let monsters_list = get_monster_config();
 
     for _ in 0..monster_num {
         let x = rand::thread_rng().gen_range(room.x1..room.x2+1);
@@ -465,7 +479,32 @@ pub fn monster_move(id: usize, player_x: i32, player_y: i32, map: &structures::M
     move_by(id, dx, dy, map, objects);
 }
 
-pub fn write(data: &editor::HelloState) {
+pub fn write_map(data: &map_editor::HelloState) {
+
+    let map_config = structures::MapConfig {
+        light_wall_r: data.light_wall_color_r.parse::<u8>().unwrap(),
+        light_wall_g: data.light_wall_color_g.parse::<u8>().unwrap(),
+        light_wall_b: data.light_wall_color_b.parse::<u8>().unwrap(),
+        dark_wall_r: data.dark_wall_color_r.parse::<u8>().unwrap(),
+        dark_wall_g: data.dark_wall_color_g.parse::<u8>().unwrap(),
+        dark_wall_b: data.dark_wall_color_b.parse::<u8>().unwrap(),
+        light_ground_r: data.light_ground_color_r.parse::<u8>().unwrap(),
+        light_ground_g: data.light_ground_color_g.parse::<u8>().unwrap(),
+        light_ground_b: data.light_ground_color_b.parse::<u8>().unwrap(),
+        dark_ground_r: data.dark_ground_color_r.parse::<u8>().unwrap(),
+        dark_ground_g: data.dark_ground_color_g.parse::<u8>().unwrap(),
+        dark_ground_b: data.dark_ground_color_b.parse::<u8>().unwrap(),   
+    };
+
+    let mut my_file = std::fs::File::create(config::CONFIG_MAP_FILE_NAME).expect("creation failed");
+    let map_config_json = structures::MapConfigJson {
+        saved_configs: map_config,
+    };
+    let serialized = serde_json::to_string(&map_config_json).unwrap();
+    my_file.write(serialized.as_bytes()).unwrap();
+}
+
+pub fn write_monster(data: &editor::HelloState) {
 
     let monster = structures::MonsterConfig { 
         symbol: data.symbol.chars().nth(0).unwrap() as char, 
@@ -478,27 +517,27 @@ pub fn write(data: &editor::HelloState) {
         b: data.b.parse::<u8>().unwrap(),
     };
 
-    if !Path::new(config::CONFIG_FILE_NAME).exists(){
-        let mut my_file = std::fs::File::create(config::CONFIG_FILE_NAME).expect("creation failed");
-        let mut monsterConfigList = vec![monster];
-        let mut monsterConfigJson = structures::MonsterConfigJson {
-            saved_configs: monsterConfigList,
+    if !Path::new(config::CONFIG_MONSTER_FILE_NAME).exists(){
+        let mut my_file = std::fs::File::create(config::CONFIG_MONSTER_FILE_NAME).expect("creation failed");
+        let monster_config_list = vec![monster];
+        let monster_config_json = structures::MonsterConfigJson {
+            saved_configs: monster_config_list,
         };
-        let serialized = serde_json::to_string(&monsterConfigJson).unwrap();
-        my_file.write(serialized.as_bytes());
+        let serialized = serde_json::to_string(&monster_config_json).unwrap();
+        my_file.write(serialized.as_bytes()).unwrap();
 
     } else {
-        let my_existing_file = std::fs::File::open(config::CONFIG_FILE_NAME).unwrap();
+        let my_existing_file = std::fs::File::open(config::CONFIG_MONSTER_FILE_NAME).unwrap();
         let json = ajson::parse_from_read(my_existing_file).unwrap();   
         let monsters_list = json.get("saved_configs").unwrap();
         let mut deserialized: Vec<structures::MonsterConfig> = serde_json::from_str(&monsters_list.as_str()).unwrap();
         deserialized.push(monster);
-        let mut monsterConfigJson = structures::MonsterConfigJson {
+        let monster_config_json = structures::MonsterConfigJson {
             saved_configs: deserialized,
         };
-        let mut my_file = std::fs::File::create(config::CONFIG_FILE_NAME).expect("creation failed");
-        let serialized = serde_json::to_string(&monsterConfigJson).unwrap();
-        my_file.write(serialized.as_bytes());
+        let mut my_file = std::fs::File::create(config::CONFIG_MONSTER_FILE_NAME).expect("creation failed");
+        let serialized = serde_json::to_string(&monster_config_json).unwrap();
+        my_file.write(serialized.as_bytes()).unwrap();
     }
      //let deserialized: Vec<structures::MonsterConfig> = serde_json::from_str(&serialized).unwrap();
     // //my_file.write_all("Hello Chercher.tech".as_bytes()).expect("write failed");
@@ -517,6 +556,6 @@ pub fn write(data: &editor::HelloState) {
 }
 
 pub fn remove() {
-    std::fs::remove_file(config::CONFIG_FILE_NAME).expect("could not remove file");
+    std::fs::remove_file(config::CONFIG_MONSTER_FILE_NAME).expect("could not remove file");
     println!("The file has been removed !");
 }

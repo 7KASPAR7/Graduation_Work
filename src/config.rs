@@ -1,5 +1,3 @@
-use tcod::colors::*;
-
 use tcod::map::{FovAlgorithm};
 
 // actual size of the window
@@ -19,7 +17,6 @@ pub const LEVEL_SCREEN_WIDTH: i32 = 40;
 pub const CHARACTER_SCREEN_WIDTH: i32 = 30;
 
 // chances
-pub const ORC_SPAWN_CHANCE: f32 = 0.75;
 pub const HEAL_SPAWN_CHANCE: f32 = 0.25;
 pub const FIRE_SCROLL_SPAWN_CHANCE: f32 = 0.25;
 pub const DOUBLE_DAMAGE_SPAWN_CHANCE: f32 = 0.25;
@@ -57,11 +54,11 @@ pub const MAX_ROOMS: i32 = 19;
 pub const MAX_ROOM_MONSTERS: i32 = 3;
 pub const MAX_ROOM_ITEMS: i32 = 2;
 
-// colors
-pub const COLOR_LIGHT_WALL: Color = Color {r: 106, g: 10, b: 171};
-pub const COLOR_DARK_WALL: Color = Color {r: 42, g: 23, b: 103};
-pub const COLOR_LIGHT_GROUND: Color = Color {r: 255, g: 207, b: 0};
-pub const COLOR_DARK_GROUND: Color = Color {r: 77, g: 50, b: 0};
+// default colors
+// pub const COLOR_LIGHT_WALL: Color = Color {r: 106, g: 10, b: 171};
+// pub const COLOR_DARK_WALL: Color = Color {r: 42, g: 23, b: 103};
+// pub const COLOR_LIGHT_GROUND: Color = Color {r: 255, g: 207, b: 0};
+// pub const COLOR_DARK_GROUND: Color = Color {r: 77, g: 50, b: 0};
 
 // FoV
 pub const FOV_ALG: FovAlgorithm = FovAlgorithm::Basic; 
@@ -74,4 +71,8 @@ pub const PLAYER: usize = 0;
 // fps
 pub const LIMIT_FPS: i32 = 20; // 20 frames-per-second maximum
 
-pub const CONFIG_FILE_NAME: &str = "my_config.json";
+pub const CONFIG_MONSTER_FILE_NAME: &str = "my_monster_config.json";
+pub const CONFIG_MAP_FILE_NAME: &str = "my_map_config.json";
+pub const VERTICAL_WIDGET_SPACING: f64 = 20.0;
+pub const SMALL_VERTICAL_WIDGET_SPACING: f64 = 10.0;
+pub const TEXT_BOX_WIDTH: f64 = 200.0;
