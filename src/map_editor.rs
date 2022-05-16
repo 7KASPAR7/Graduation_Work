@@ -172,5 +172,5 @@ fn build_root_widget() -> impl Widget<HelloState> {
         .with_child(generate_map_button);
     
     // center the two widgets in the available space
-    Align::centered(layout)
+    Align::left(layout)
 }

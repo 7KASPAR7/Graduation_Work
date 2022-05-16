@@ -78,6 +78,7 @@ pub fn render(tcod: &mut structures::Tcod, game: &mut structures::Game, objects:
     for y in 0..config::MAP_HEIGHT {
         for x in 0..config::MAP_WIDTH {
             let visible = tcod.fov.is_in_fov(x, y);
+            //let visible = true;
             let wall = game.map[x as usize][y as usize].is_visible;
             let color = match (visible, wall) {
                 (false, true) => dark_wall_color,
@@ -237,9 +238,10 @@ fn spawn_objects(room: structures::Rect, map: &structures::Map, objects: &mut Ve
             let data = &monsters_list[num];
             let color = Color {r: data.r, g: data.g, b: data.b};
             monster = structures::Object::new(x, y, data.symbol, color, &data.name, true);
-            monster.attackable = Some(structures::Attackable{max_hp: data.max_hp, hp: data.max_hp, armor: data.armor, damage: data.damage, xp: 75, on_death: structures::DeathCallback::Monster});
+            monster.attackable = Some(structures::Attackable{max_hp: data.max_hp, hp: data.max_hp, armor: data.armor, damage: data.damage, xp: config::DEFAULT_MONSTER_XP, on_death: structures::DeathCallback::Monster});
             monster.alive = true;
             monster.ai = Some(structures::Ai::Basic);
+            //monster.always_visible = true;
             objects.push(monster);
         }
     }
@@ -253,12 +255,12 @@ fn spawn_objects(room: structures::Rect, map: &structures::Map, objects: &mut Ve
         if !is_blocked(x, y, map, objects) {
             let chance = rand::random::<f32>();
             let item = if chance < config::HEAL_SPAWN_CHANCE {
-                let mut object = structures::Object::new(x, y, '!',  VIOLET, "healing potion", false);
+                let mut object = structures::Object::new(x, y, '!',  YELLOW, "healing potion", false);
                 object.item = Some(structures::Item::Heal);
                 object.always_visible = true;
                 object
             } else if chance < config::HEAL_SPAWN_CHANCE + config::FIRE_SCROLL_SPAWN_CHANCE {
-                let mut object = structures::Object::new(x, y, '#', LIGHT_ORANGE, "scroll of fire mark", false);
+                let mut object = structures::Object::new(x, y, '#', RED, "scroll of fire mark", false);
                 object.item = Some(structures::Item::Fire);
                 object.always_visible = true;
                 object
@@ -269,7 +271,7 @@ fn spawn_objects(room: structures::Rect, map: &structures::Map, objects: &mut Ve
                 object.always_visible = true;
                 object
             } else {
-                let mut object = structures::Object::new(x, y, '?', BLACK, "Flesh", false);
+                let mut object = structures::Object::new(x, y, '?', GREY, "Flesh", false);
                 object.item = Some(structures::Item::Blind);
                 object.always_visible = true;
                 object
@@ -352,10 +354,11 @@ pub fn set_tcod(root: tcod::console::Root) -> structures::Tcod{
 }
 
 pub fn create_player() -> structures::Object {
-    let mut player = structures::Object::new(5, 5, '@', BLUE, "Player", true);
+    let mut player = structures::Object::new(5, 5, '@', WHITE, "Player", true);
 
     player.alive = true;
     player.attackable = Some(structures::Attackable{max_hp: 100, hp: 100, armor: 6, damage: 10, xp: 0, on_death: structures::DeathCallback::Player});
+    //player.always_visible = true;
 
     player
 }

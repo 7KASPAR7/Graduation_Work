@@ -41,6 +41,8 @@ pub const PLAYER_DAMAGE_PER_LEVEL: i32 = 5;
 pub const PLAYER_ARMOR_PER_LEVEL: i32 = 3;
 pub const PLAYER_MAX_HP_PER_LEVEL: i32 = 25;
 
+pub const DEFAULT_MONSTER_XP: i32 = 75;
+
 // messages
 pub const MESSAGES_X: i32 = BAR_WIDTH + 2;
 pub const MESSAGES_WIDTH: i32 = SCREEN_WIDTH - BAR_WIDTH - 2;
